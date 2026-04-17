@@ -1,0 +1,25 @@
+Neo-Brutalist Brand Rulebook
+
+Design every UI with a high-contrast Neo-Brutalist identity:
+
+1) Color palette (strict):
+- Safety Orange: #FF6B00
+- Black: #000000
+- White: #FFFFFF
+- Do not introduce additional brand colors unless explicitly requested.
+
+2) Visual styling:
+- Use 4px solid black borders for primary surfaces, controls, and HUD elements.
+- Use zero rounded corners (no border radius).
+- Use heavy typography only: Inter 900 or monospace bold equivalents.
+- Prioritize hard edges, stark contrast, and blocky spacing.
+
+3) Product tone:
+- Urgent, industrial, and high-stakes.
+- Prefer direct, action-oriented labels and microcopy.
+- Avoid soft, playful, or decorative styling.
+
+4) UI implementation defaults:
+- Buttons and panels should feel tactile and assertive.
+- Shadows should be minimal or absent unless they reinforce depth with hard offsets.
+- Layout should emphasize utility and command-center readability.
