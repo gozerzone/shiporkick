@@ -18,7 +18,7 @@ type SessionRow = {
 
 export async function fetchActiveStreamers(): Promise<LeaderboardStreamer[]> {
   if (!supabase) {
-    throw new Error('Supabase client is not configured.')
+    return []
   }
 
   const { data, error } = await supabase
@@ -45,7 +45,7 @@ export async function fetchActiveStreamers(): Promise<LeaderboardStreamer[]> {
 
 export function subscribeToLeaderboardRefresh(onRefresh: () => void) {
   if (!supabase) {
-    throw new Error('Supabase client is not configured.')
+    return () => {}
   }
   const client = supabase
 

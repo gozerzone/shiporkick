@@ -52,3 +52,42 @@ This app is a **static front-end** after build. Cloudways “PHP default” page
 5. **Environment**: Vite bakes `VITE_*` at **build time**. For production keys, set them on the machine that runs `npm run build`, or use your CI secrets, then rebuild and re-upload `dist/`.
 
 If you still see a PHP page after uploading `dist/`, the domain is almost certainly still mapped to **another application** or **another folder** — in Cloudways, open that domain’s application and confirm **Deployment Path / public_html** matches where you uploaded the files.
+
+## Deploy via Git (Cloudways pulls from GitHub/GitLab/Bitbucket)
+
+Do this **once**, then every deploy is `git push` (plus whatever Cloudways runs on pull).
+
+### 1. Host the repo remotely
+
+- Create a **GitHub** (or GitLab / Bitbucket) repository.
+- From your laptop, add the remote and push your default branch (usually `main`):
+
+  ```bash
+  git remote add origin https://github.com/YOU/shiporkick.git   # if not already set
+  git push -u origin main
+  ```
+
+- Never commit **`.env`** (secrets). Only `.env.example` stays in Git. Production `VITE_*` values must be supplied where the **build** runs (step 3).
+
+### 2. Connect Cloudways to that repo
+
+In the Cloudways panel: open the **correct application** for this site → **Deployment via Git** (wording can vary slightly).
+
+- Authorize Cloudways to your Git provider if asked.
+- Choose the repository and branch (e.g. `main`).
+- Set the deployment path Cloudways documents for that app (often the app folder whose **`public_html`** is the web root).
+
+### 3. Build on the server after each pull
+
+This project is **Vite**: the live site must be the contents of **`dist/`** after `npm run build`. Cloudways should run a **post-pull / deployment hook** that, at minimum:
+
+1. Uses **Node.js 22+** (install or `nvm` in the hook if your stack allows it).
+2. Runs `npm ci` then `npm run build` with **`VITE_*` environment variables set** in that environment (Cloudways UI for env vars, or `export` in the hook — same names as `.env.example`).
+3. Copies **`dist/`** into **`public_html`** (replace old `index.html` and `assets/` so hashed filenames stay in sync).
+
+Exact paths and hook syntax depend on your Cloudways stack; if their template only runs `composer install`, replace that with the Node + copy steps above or use **GitHub Actions** to build and rsync `dist/` over SSH (alternative).
+
+### 4. After setup
+
+- Each release: commit locally, **`git push origin main`**, then trigger or wait for Cloudways to pull (webhook or “Pull / Deploy” in the panel).
+- Hard-refresh once if you previously used aggressive caching; see `.htaccess` rules for `index.html` vs hashed assets.

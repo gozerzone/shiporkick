@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 :root {
   font-family: Inter, "Arial Black", "SF Mono", "Roboto Mono", monospace;
   color: #000000;
@@ -14,31 +19,45 @@
 body {
   margin: 0;
   min-height: 100vh;
+  min-height: 100dvh;
   font-weight: 900;
   background: #ffffff;
+  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 #root {
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .app {
   min-height: 100vh;
-  padding: 1.5rem;
+  min-height: 100dvh;
+  padding: clamp(0.75rem, 4vw, 1.5rem);
+  padding-bottom: max(clamp(0.75rem, 4vw, 1.5rem), env(safe-area-inset-bottom, 0px));
   display: grid;
   gap: 1rem;
+  max-width: 100%;
 }
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
   gap: 1rem;
+  max-width: 100%;
+}
+
+.grid > * {
+  min-width: 0;
 }
 
 .panel {
   border: 4px solid #000000;
   background: #ffffff;
   padding: 1rem;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .panel--hero {
@@ -56,13 +75,20 @@ body {
 
 .title {
   margin: 0.3rem 0;
-  font-size: clamp(1.8rem, 4vw, 3rem);
+  font-size: clamp(1.35rem, 2.2vw + 1.1rem, 3rem);
   line-height: 1;
 }
 
 .subtitle {
   margin: 0;
   max-width: 70ch;
+}
+
+.app p,
+.stack p,
+.multiplexer p {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .panel__title {
@@ -101,7 +127,8 @@ body {
 
 .preview {
   width: 100%;
-  min-height: 22rem;
+  max-width: 100%;
+  min-height: clamp(12rem, 42vh, 22rem);
   border: 4px solid #000000;
   background: #000000;
   object-fit: cover;
@@ -110,10 +137,31 @@ body {
 .multiplexer {
   display: grid;
   gap: 0.75rem;
+  max-width: 100%;
+}
+
+.viewer-stage__video {
+  width: 100%;
+  max-width: 100%;
+  min-height: clamp(12rem, 42vh, 22rem);
+  border: 4px solid #000000;
+  background: #000000;
+  object-fit: contain;
+}
+
+.viewer-stage__audio {
+  display: none;
+}
+
+.viewer-stage__note {
+  margin: 0;
+  font-size: 0.875rem;
+  max-width: 70ch;
 }
 
 .multiplexer__stage {
   position: relative;
+  max-width: 100%;
 }
 
 .camera-chip {
@@ -172,23 +220,114 @@ body {
   background: #000000;
 }
 
+/* Bottom dock: sheet + tab handle (tab flush to viewport bottom). */
 .streamer-hud {
   position: fixed;
-  top: 1rem;
-  right: 1rem;
-  width: min(36rem, calc(100vw - 2rem));
-  border: 4px solid #000000;
-  background: #ff6b00;
-  color: #000000;
-  padding: 1rem;
+  left: 0;
+  right: 0;
+  bottom: 0;
   z-index: 1200;
-  display: grid;
-  gap: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  background: transparent;
+  pointer-events: none;
 }
 
-.streamer-hud--minimized {
-  width: min(26rem, calc(100vw - 2rem));
-  gap: 0.4rem;
+.streamer-hud > * {
+  pointer-events: auto;
+}
+
+.streamer-hud__sheet {
+  width: min(36rem, calc(100vw - 0.75rem));
+  max-height: min(58vh, 26rem);
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 4px solid #000000;
+  border-bottom: 0;
+  background: #ff6b00;
+  color: #000000;
+  padding: 0.85rem 1rem 0.65rem;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.streamer-hud--minimized .streamer-hud__sheet {
+  display: none;
+}
+
+.streamer-hud__tab {
+  width: 100%;
+  margin: 0;
+  padding: 0.55rem 0.75rem;
+  padding-bottom: max(0.55rem, env(safe-area-inset-bottom, 0px));
+  border: 4px solid #000000;
+  border-bottom: 0;
+  background: #ff6b00;
+  color: #000000;
+  font: inherit;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.streamer-hud__tab-cue {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+.streamer-hud__tab-label {
+  flex: 1 1 auto;
+  text-align: center;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.streamer-hud__tab-action {
+  flex-shrink: 0;
+  border: 4px solid #000000;
+  background: #ffffff;
+  color: #000000;
+  padding: 0.12rem 0.4rem;
+  font-size: 0.7rem;
+}
+
+.app:has(.streamer-hud) {
+  padding-bottom: calc(3.25rem + env(safe-area-inset-bottom, 0px));
+}
+
+.app:has(.streamer-hud:not(.streamer-hud--minimized)) {
+  padding-bottom: min(65vh, calc(27rem + env(safe-area-inset-bottom, 0px)));
+}
+
+@media (max-width: 40rem) {
+  .streamer-hud__task {
+    font-size: clamp(1.25rem, 7vw, 2.25rem);
+  }
+
+  .btn,
+  .select,
+  input,
+  select,
+  textarea {
+    font-size: 1rem;
+  }
 }
 
 .streamer-hud__header {
@@ -198,25 +337,10 @@ body {
   gap: 0.75rem;
 }
 
-.streamer-hud__toggle {
-  border: 4px solid #000000;
-  background: #ffffff;
-  color: #000000;
-  font: inherit;
-  padding: 0.2rem 0.55rem;
-}
-
 .streamer-hud__kicker {
   margin: 0;
   font-size: 0.8rem;
   letter-spacing: 0.06em;
-}
-
-.streamer-hud__mini-status {
-  margin: 0;
-  border: 4px solid #000000;
-  background: #ffffff;
-  padding: 0.45rem 0.55rem;
 }
 
 .streamer-hud__task {
@@ -268,6 +392,8 @@ body {
 
 .leaderboard__table-wrap {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
   border: 4px solid #000000;
   background: #ffffff;
 }
@@ -275,8 +401,16 @@ body {
 .leaderboard__table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 40rem;
+  min-width: 0;
+  table-layout: fixed;
   background: #ffffff;
+}
+
+@media (min-width: 56rem) {
+  .leaderboard__table {
+    min-width: 40rem;
+    table-layout: auto;
+  }
 }
 
 .leaderboard__table th,
@@ -285,6 +419,8 @@ body {
   text-align: left;
   padding: 0.65rem;
   vertical-align: top;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .leaderboard__table th {
@@ -337,6 +473,9 @@ body {
   border: 4px solid #000000;
   background: #ffffff;
   padding: 0.2em 0.35em;
+  max-width: calc(100vw - 1.5rem);
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
   animation: wasted-pulse 0.65s steps(1, end) infinite;
 }
 

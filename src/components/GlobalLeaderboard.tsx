@@ -5,6 +5,10 @@ import {
   type LeaderboardStreamer,
 } from '../lib/globalLeaderboardRealtime'
 
+const supabaseConfigured = Boolean(
+  import.meta.env.VITE_SUPABASE_URL?.trim() && import.meta.env.VITE_SUPABASE_ANON_KEY?.trim(),
+)
+
 export function GlobalLeaderboard() {
   const [rows, setRows] = useState<LeaderboardStreamer[]>([])
   const [loading, setLoading] = useState(true)
@@ -14,6 +18,13 @@ export function GlobalLeaderboard() {
     let mounted = true
 
     const load = async () => {
+      if (!supabaseConfigured) {
+        if (mounted) {
+          setRows([])
+          setLoading(false)
+        }
+        return
+      }
       try {
         const data = await fetchActiveStreamers()
         if (!mounted) return
@@ -23,6 +34,7 @@ export function GlobalLeaderboard() {
         if (!mounted) return
         const message =
           loadError instanceof Error ? loadError.message : 'Failed to load leaderboard.'
+        setRows([])
         setError(message)
       } finally {
         if (mounted) {
@@ -53,6 +65,12 @@ export function GlobalLeaderboard() {
       <h2 className="panel__title">Global Leaderboard</h2>
       <p className="leaderboard__sub">Live streamers, current quests, and crowd vouches.</p>
 
+      {!supabaseConfigured ? (
+        <p className="error">
+          Leaderboard offline: set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY at build time, then run SQL
+          migrations in Supabase.
+        </p>
+      ) : null}
       {loading ? <p>Loading active streamers...</p> : null}
       {error ? <p className="error">Leaderboard error: {error}</p> : null}
 

@@ -110,6 +110,8 @@ export function useCaptureStudio() {
       stop,
       openPiPWindow,
     }),
+    // start/stop/openPiPWindow close over refs + setState; stable enough for consumers.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
     [state],
   )
 }

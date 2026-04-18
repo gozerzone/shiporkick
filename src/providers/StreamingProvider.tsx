@@ -15,6 +15,8 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { resolveHostRoomName } from '../lib/livekitRoom'
+import { coerceHttpsUrl, coerceLiveKitServerUrl } from '../lib/secureUrls'
 
 type JoinMode = 'host' | 'viewer'
 
@@ -32,13 +34,9 @@ interface StreamingContextValue {
 
 const StreamingContext = createContext<StreamingContextValue | null>(null)
 
-function buildRoomName(userId: string) {
-  const sanitized = userId.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-')
-  return `stream-${sanitized || 'anonymous'}`
-}
-
 async function requestLiveKitToken(roomName: string, userId: string, mode: JoinMode) {
-  const endpoint = import.meta.env.VITE_LIVEKIT_TOKEN_ENDPOINT
+  const endpointRaw = import.meta.env.VITE_LIVEKIT_TOKEN_ENDPOINT?.trim()
+  const endpoint = endpointRaw ? coerceHttpsUrl(endpointRaw) : ''
   const fallbackToken = import.meta.env.VITE_LIVEKIT_TOKEN
 
   if (!endpoint) {
@@ -79,7 +77,10 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
   const publishedVideoRef = useRef<MediaStreamTrack | null>(null)
   const publishedAudioRef = useRef<MediaStreamTrack | null>(null)
 
-  const wsUrl = import.meta.env.VITE_LIVEKIT_URL ?? ''
+  const wsUrl = useMemo(
+    () => coerceLiveKitServerUrl(import.meta.env.VITE_LIVEKIT_URL?.trim() ?? ''),
+    [],
+  )
   const roomCtxValue = useMemo(() => room, [room])
 
   useEffect(() => {
@@ -112,7 +113,7 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 
   const connectAsHost = useCallback(
     async (userId: string) => {
-      const nextRoomName = buildRoomName(userId)
+      const nextRoomName = resolveHostRoomName(userId)
       await connect(nextRoomName, userId, 'host')
     },
     [connect],
@@ -145,6 +146,8 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 
       await room.localParticipant.publishTrack(videoTrack, {
         source: Track.Source.ScreenShare,
+        simulcast: false,
+        videoCodec: 'vp8',
       })
       publishedVideoRef.current = videoTrack
 
@@ -202,6 +205,8 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
   )
 }
 
+// Hook colocated with provider; Fast Refresh keeps working for the default export pattern in this bundle.
+// eslint-disable-next-line react-refresh/only-export-components -- useStreaming must share StreamingContext
 export function useStreaming() {
   const ctx = useContext(StreamingContext)
   if (!ctx) {

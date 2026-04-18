@@ -4,8 +4,10 @@ import { FoulButton } from './components/FoulButton'
 import { GlobalLeaderboard } from './components/GlobalLeaderboard'
 import { StreamerHUD } from './components/StreamerHUD'
 import { StreamMultiplexer } from './components/StreamMultiplexer'
+import { ViewerStage } from './components/ViewerStage'
 import { WastedOverlay } from './components/WastedOverlay'
 import { getAuthContext, type AuthProvider } from './lib/auth'
+import { liveKitStaticTokenNeedsRoomHint } from './lib/livekitRoom'
 import { subscribeToSessionHealth } from './lib/sessionHealthRealtime'
 import { useStreaming } from './providers/StreamingProvider'
 
@@ -29,8 +31,10 @@ function App() {
   const hasTokenFlow = Boolean(
     import.meta.env.VITE_LIVEKIT_TOKEN_ENDPOINT || import.meta.env.VITE_LIVEKIT_TOKEN,
   )
-  const cooldownRemainingMs = cooldownUntil ? Math.max(0, cooldownUntil - Date.now()) : 0
-  const cooldownRemainingMinutes = Math.ceil(cooldownRemainingMs / 60000)
+  const liveKitRoomHintNeeded = liveKitStaticTokenNeedsRoomHint()
+  const [cooldownRemainingMs, setCooldownRemainingMs] = useState(0)
+  const displayCooldownMs = cooldownUntil ? cooldownRemainingMs : 0
+  const cooldownRemainingMinutes = Math.ceil(displayCooldownMs / 60000)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -43,26 +47,28 @@ function App() {
     const nextCooldown =
       Number.isFinite(parsedCooldown) && parsedCooldown > 0 ? parsedCooldown : storedCooldown
 
-    if (nextCooldown > Date.now()) {
-      setCooldownUntil(nextCooldown)
-      setIsLobbyMode(true)
-      window.localStorage.setItem(COOLDOWN_STORAGE_KEY, String(nextCooldown))
-    } else {
-      window.localStorage.removeItem(COOLDOWN_STORAGE_KEY)
-    }
-
-    if (mode !== 'viewer' || !room) return
-    setViewerSessionId(session)
-    setActiveSessionId(session)
-
-    void (async () => {
-      try {
-        await connectAsViewer(room)
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Viewer join failed.'
-        setViewerError(message)
+    queueMicrotask(() => {
+      if (nextCooldown > Date.now()) {
+        setCooldownUntil(nextCooldown)
+        setIsLobbyMode(true)
+        window.localStorage.setItem(COOLDOWN_STORAGE_KEY, String(nextCooldown))
+      } else {
+        window.localStorage.removeItem(COOLDOWN_STORAGE_KEY)
       }
-    })()
+
+      if (mode !== 'viewer' || !room) return
+      setViewerSessionId(session)
+      setActiveSessionId(session)
+
+      void (async () => {
+        try {
+          await connectAsViewer(room)
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Viewer join failed.'
+          setViewerError(message)
+        }
+      })()
+    })
   }, [connectAsViewer])
 
   useEffect(() => {
@@ -80,14 +86,21 @@ function App() {
 
   useEffect(() => {
     if (!cooldownUntil) return
-    const timer = window.setInterval(() => {
-      if (Date.now() < cooldownUntil) return
+    const tick = () => {
+      const ms = Math.max(0, cooldownUntil - Date.now())
+      setCooldownRemainingMs(ms)
+      if (ms > 0) return
       setCooldownUntil(null)
       setIsLobbyMode(false)
       window.localStorage.removeItem(COOLDOWN_STORAGE_KEY)
       window.history.replaceState({}, '', `${window.location.pathname}`)
-    }, 1000)
-    return () => window.clearInterval(timer)
+    }
+    const first = window.setTimeout(tick, 0)
+    const timer = window.setInterval(tick, 1000)
+    return () => {
+      window.clearTimeout(first)
+      window.clearInterval(timer)
+    }
   }, [cooldownUntil])
 
   useEffect(() => {
@@ -121,7 +134,7 @@ function App() {
           One-button startup for screen plus camera capture and sub-second LiveKit delivery.
         </p>
         <p>Use the multiplexer below to arm simultaneous screen + camera capture.</p>
-        {isLobbyMode && cooldownRemainingMs > 0 ? (
+        {isLobbyMode && displayCooldownMs > 0 ? (
           <p className="error">
             PROCRASTINATION COOLDOWN ACTIVE: {cooldownRemainingMinutes} minute(s) remaining.
           </p>
@@ -161,6 +174,13 @@ function App() {
             />
             <p>Endpoint: {hasEndpoint ? 'READY' : 'Missing VITE_LIVEKIT_URL'}</p>
             <p>Token flow: {hasTokenFlow ? 'READY' : 'Missing token endpoint/token'}</p>
+            {liveKitRoomHintNeeded ? (
+              <p className="error">
+                Static LiveKit token in use without VITE_LIVEKIT_ROOM. Set VITE_LIVEKIT_ROOM to the same room name
+                baked into that JWT, or switch to VITE_LIVEKIT_TOKEN_ENDPOINT. Otherwise joins fail or tracks never
+                publish.
+              </p>
+            ) : null}
             <p>Connection: {isConnected ? 'CONNECTED' : 'DISCONNECTED'}</p>
             <p>Room: {roomName}</p>
             <p>Share Link: {shareLink}</p>
@@ -171,13 +191,14 @@ function App() {
           <h2 className="panel__title">{viewerSessionId ? 'Viewer Controls' : 'Stream Multiplexer'}</h2>
           {viewerSessionId ? (
             <div className="stack">
+              <ViewerStage />
               <FoulButton sessionId={viewerSessionId} />
               <Bounty sessionId={viewerSessionId} />
             </div>
           ) : (
             <StreamMultiplexer
               userId={userId}
-              disabled={isLobbyMode && cooldownRemainingMs > 0}
+              disabled={isLobbyMode && displayCooldownMs > 0}
               kickSignal={kickSignal}
             />
           )}

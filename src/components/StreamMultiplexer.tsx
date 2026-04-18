@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react'
 import { useStreaming } from '../providers/StreamingProvider'
 
 interface Point {
@@ -13,6 +13,35 @@ interface StreamMultiplexerProps {
 }
 
 const CAMERA_SIZE = 170
+
+function waitVideoReady(video: HTMLVideoElement, label: string, timeoutMs = 25000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const finish = () => {
+      if (video.videoWidth > 0 && video.videoHeight > 0) {
+        cleanup()
+        resolve()
+      }
+    }
+    const cleanup = () => {
+      window.clearTimeout(timer)
+      video.removeEventListener('loadedmetadata', onMeta)
+      video.removeEventListener('resize', onResize)
+    }
+    const onMeta = () => finish()
+    const onResize = () => finish()
+    video.addEventListener('loadedmetadata', onMeta)
+    video.addEventListener('resize', onResize)
+    finish()
+    const timer = window.setTimeout(() => {
+      cleanup()
+      reject(
+        new Error(
+          `${label}: no video dimensions yet. Pick a real screen/window in the share dialog, or try another browser.`,
+        ),
+      )
+    }, timeoutMs)
+  })
+}
 
 function stopStream(stream: MediaStream | null) {
   if (!stream) return
@@ -56,19 +85,7 @@ export function StreamMultiplexer({
     positionRef.current = position
   }, [position])
 
-  useEffect(() => {
-    return () => {
-      void stopBroadcast()
-    }
-  }, [])
-
-  useEffect(() => {
-    if (kickSignal <= 0) return
-    if (!isLive && !isStarting) return
-    void stopBroadcast()
-  }, [kickSignal, isLive, isStarting])
-
-  const stopBroadcast = async () => {
+  const stopBroadcast = useCallback(async () => {
     renderStopRef.current = true
     unpublishMultiplexedTracks()
     stopStream(screenStreamRef.current)
@@ -93,7 +110,22 @@ export function StreamMultiplexer({
     setIsLive(false)
     setIsStarting(false)
     await disconnect()
-  }
+  }, [disconnect, unpublishMultiplexedTracks])
+
+  useEffect(() => {
+    return () => {
+      void stopBroadcast()
+    }
+  }, [stopBroadcast])
+
+  useEffect(() => {
+    if (kickSignal <= 0) return
+    if (!isLive && !isStarting) return
+    const handle = window.setTimeout(() => {
+      void stopBroadcast()
+    }, 0)
+    return () => window.clearTimeout(handle)
+  }, [kickSignal, isLive, isStarting, stopBroadcast])
 
   const startBroadcast = async () => {
     if (disabled || isStarting || isLive) return
@@ -103,18 +135,32 @@ export function StreamMultiplexer({
     renderStopRef.current = false
 
     try {
+      if (!window.isSecureContext) {
+        throw new Error('Screen and camera require HTTPS (or localhost). Open the site over SSL.')
+      }
+      if (!navigator.mediaDevices?.getDisplayMedia || !navigator.mediaDevices?.getUserMedia) {
+        throw new Error('This browser does not expose screen/camera capture APIs.')
+      }
+
       await connectAsHost(userId)
 
-      const [screenStream, cameraStream] = await Promise.all([
-        navigator.mediaDevices.getDisplayMedia({
-          video: true,
-          audio: false,
-        }),
-        navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 1280 }, height: { ideal: 720 } },
-          audio: true,
-        }),
-      ])
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: false,
+      })
+      const screenVideoTrack = screenStream.getVideoTracks()[0]
+      if (screenVideoTrack) {
+        screenVideoTrack.addEventListener('ended', () => {
+          if (renderStopRef.current) return
+          setError('Screen share stopped (track ended).')
+          void stopBroadcast()
+        })
+      }
+
+      const cameraStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: true,
+      })
 
       screenStreamRef.current = screenStream
       cameraStreamRef.current = cameraStream
@@ -128,6 +174,10 @@ export function StreamMultiplexer({
       screenVideo.playsInline = true
       cameraVideo.playsInline = true
       await Promise.all([screenVideo.play(), cameraVideo.play()])
+      await Promise.all([
+        waitVideoReady(screenVideo, 'Screen capture'),
+        waitVideoReady(cameraVideo, 'Camera'),
+      ])
 
       const width = screenVideo.videoWidth || 1920
       const height = screenVideo.videoHeight || 1080
