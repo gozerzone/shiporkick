@@ -10,6 +10,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "deploy:cloudways": "bash ./cloudways-deploy.sh",
+    "publish:dist": "node ./scripts/publish-dist.mjs",
     "lint": "eslint .",
     "preview": "vite preview"
   },

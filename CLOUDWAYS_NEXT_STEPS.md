@@ -175,6 +175,34 @@ export SHIPORKICK_WEBROOT="$(pwd)/.."
 bash ./cloudways-deploy.sh
 ```
 
+### `bash: ./cloudways-deploy.sh: No such file or directory`
+
+The server’s Git checkout is **older than** the commit that added `cloudways-deploy.sh`. From **`public_html`** run:
+
+```bash
+git fetch origin && git reset --hard origin/main
+```
+
+(or `git pull origin main` if you prefer a merge). Confirm with `ls cloudways-deploy.sh`, then run the hook again.
+
+**If you already ran `npm run build` and only need to fix the live site right now** (no `git pull` yet), copy `dist/` into the web root manually:
+
+```bash
+cp -f dist/index.html ./index.html
+rm -rf assets && cp -R dist/assets ./assets
+test -f dist/.htaccess && cp -f dist/.htaccess ./.htaccess || true
+```
+
+**Hook without relying on the shell script** (after the repo has `scripts/publish-dist.mjs` from Git):
+
+```bash
+cd /home/master/applications/qereqenxmn/public_html
+export SHIPORKICK_CLOUDWAYS_DEPLOY=1
+npm install
+npm run build
+npm run publish:dist
+```
+
 ### After saving the hook
 
 1. Click **Deploy / Pull** once more.

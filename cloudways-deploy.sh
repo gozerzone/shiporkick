@@ -63,19 +63,7 @@ if [[ "${SHIPORKICK_CLOUDWAYS_DEPLOY:-}" != "1" ]]; then
   exit 0
 fi
 
-PUBLISH_ROOT="${SHIPORKICK_WEBROOT:-$ROOT}"
-PUBLISH_ROOT="$(cd "$PUBLISH_ROOT" && pwd)"
-
-cp -f dist/index.html "$PUBLISH_ROOT/index.html"
-rm -rf "$PUBLISH_ROOT/assets"
-cp -R dist/assets "$PUBLISH_ROOT/assets"
-if [[ -f dist/.htaccess ]]; then
-  cp -f dist/.htaccess "$PUBLISH_ROOT/.htaccess"
+if [[ -n "${SHIPORKICK_WEBROOT:-}" ]]; then
+  export SHIPORKICK_WEBROOT
 fi
-
-if ! grep -q '/assets/' "$PUBLISH_ROOT/index.html"; then
-  echo "cloudways-deploy.sh: published index.html has no /assets/ — publish failed." >&2
-  exit 1
-fi
-
-echo "cloudways-deploy.sh: OK — published Vite dist into $PUBLISH_ROOT"
+node "$ROOT/scripts/publish-dist.mjs"
