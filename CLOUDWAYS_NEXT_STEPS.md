@@ -2,8 +2,22 @@
 
 ## Already done on this machine (nothing for you to repeat)
 
-- Your latest ShipOrKick code was **committed** and **`git push`’d to** `https://github.com/gozerzone/shiporkick.git` **branch `main`** (commit after `abf46c7`).
-- **`dist/` is not in Git** (on purpose — it is in `.gitignore`). The server must **build** after each pull, or you must use another CI step that builds and uploads `dist/`.
+- Your latest ShipOrKick code was **committed** and **`git push`’d to** `https://github.com/gozerzone/shiporkick.git` **branch `main`**.
+- **`dist/` is not in Git** (on purpose — it is in `.gitignore`). The server must **run `npm run build`** after each pull and **publish `dist/` into the real web root** (`public_html`), or the live site will never change.
+
+---
+
+## Diagnosis (if View Source still has NO `viewport-fit`)
+
+That means **GitHub is ahead of what `shiporkick.com` is serving**.
+
+- **GitHub `main` is correct.** Example: the source `index.html` on GitHub includes `viewport-fit=cover` (open  
+  `https://raw.githubusercontent.com/gozerzone/shiporkick/main/index.html` in a browser and search for `viewport-fit`).
+- **Your domain is still serving an old built file** from **`public_html`** (old `index.html` + old `/assets/index-….js`).
+
+So: **Cloudways “Git deploy success” is not updating `public_html` with a fresh Vite build.** Usually the deploy only **pulled** the repo somewhere else, or pulled but **never ran `npm run build` + copy `dist/`**.
+
+You need **Step 3a → 3b** below.
 
 ---
 
@@ -36,27 +50,100 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 ```
 
-…and **no** `viewport-fit`, then **the web root was not updated** with a fresh build from the new Git code. Go to **Step 3**.
+…and **no** `viewport-fit`, then **the web root was not updated** with a fresh build from the new Git code. Go to **Step 3a**.
 
 ---
 
-## Step 3 — Make sure Cloudways **builds Vite** and copies **`dist/`** to the web root (you do this; one-time unless already correct)
+## Step 3a — Find where the live site really lives (you do this, ~5 minutes)
 
-Cloudways “git success” often means **only `git pull`**. For this project you also need:
+Do this so we know **which folder** must get `dist/`.
 
-1. **Node 22+** available in the environment that runs your hook (Cloudways docs vary by stack).
-2. After pull, from the **repo root** on the server, something equivalent to:
-   - `npm ci`
-   - `npm run build`  
-     (with **`VITE_*`** variables set for production — same names as `.env.example`)
-3. Then copy **everything inside `dist/`** into **`public_html`** (overwrite old `index.html` and `assets/`).
+### Option A — Cloudways File Manager (easiest)
 
-**Where to configure this in Cloudways**
+1. Cloudways → **your ShipOrKick application**.
+2. Open **“Application Management”** (or **“Access Details”**) and launch **File Manager** / **“Launch SSH Terminal”** area — you need the path that contains **`public_html`** for this app.
+3. In File Manager, open **`public_html`**.
+4. Click **`index.html`** → **Edit** or **Download**.
+5. Search inside that file for **`viewport-fit`**.
+   - **If it is missing** here too, then **`public_html/index.html` was never replaced** after your Git deploy. That confirms the problem is **build / copy**, not your laptop.
 
-- Still under **Deployment via GIT**, look for **“Deployment Hook”**, **“Post-deployment script”**, or **“Build / deploy commands”** (exact label varies).
-- If you **cannot** find any place to run shell commands, open **Cloudways chat / ticket** and ask: *“Where do I add a post-deployment script to run `npm ci && npm run build` and sync `dist/` to `public_html` for this app?”*
+### Option B — SSH (if you use the terminal)
 
-**Checkpoint:** After the next deploy, **Step 2** should show `viewport-fit` in the HTML source.
+1. Cloudways → **Master Credentials** / **SSH** → connect with the credentials they show.
+2. Run:
+
+   ```bash
+   cd ~/applications && ls
+   ```
+
+   You should see one folder per app (odd-looking name). `cd` into the folder that is **this** ShipOrKick app (if unsure, repeat the steps below in each until you find `shiporkick` / `package.json`).
+
+3. Then:
+
+   ```bash
+   find . -maxdepth 4 -name index.html 2>/dev/null
+   ```
+
+4. For **each** path printed, run:
+
+   ```bash
+   head -15 ./PATH/TO/index.html
+   ```
+
+   The one that matches **what you see in the browser** (old viewport, old `/assets/index-…`) is the file Cloudways must **overwrite** when you deploy.
+
+**Write down** the directory that contains that `index.html` (call it **WEBROOT**). Often it is `.../public_html`.
+
+---
+
+## Step 3b — Add a deployment hook that builds Vite and publishes `dist/` (you do this)
+
+**Prerequisite:** In Cloudways application settings, define **environment variables** for anything in `.env.example` that starts with `VITE_` (same names). The `npm run build` step reads them.
+
+Then, under **Deployment via GIT**, find the field for a **shell script** that runs **after** git pull. Paste a script that matches **your layout**:
+
+### Layout 1 — Git repo files live **directly** in `public_html` (you see `package.json` next to `index.html` in File Manager)
+
+```bash
+#!/bin/bash
+set -e
+cd /home/master/applications/YOUR_APP_FOLDER/public_html
+npm ci
+npm run build
+rsync -av --delete dist/ ./
+```
+
+Replace `YOUR_APP_FOLDER` with the real folder name under `applications/`.
+
+### Layout 2 — Git repo is in a **subfolder** (e.g. `public_html/shiporkick/` has `package.json`)
+
+```bash
+#!/bin/bash
+set -e
+cd /home/master/applications/YOUR_APP_FOLDER/public_html/shiporkick
+npm ci
+npm run build
+rsync -av --delete dist/ ../
+```
+
+That copies the built site into **`public_html`** one level up.
+
+### After saving the hook
+
+1. Click **Deploy / Pull** once more.
+2. Read the **deployment log**. If the hook fails, the log usually shows **`npm: command not found`** (Node not installed for that user) or **`Permission denied`** (run **Reset Permissions** in Application Settings, then redeploy — Cloudways docs mention this for `npm`).
+
+**Checkpoint:** **Step 2** again — View Source on `https://shiporkick.com` must show **`viewport-fit`**.
+
+---
+
+## Step 3c — If there is no hook field anywhere
+
+Open **Cloudways live chat / ticket** and paste this one sentence:
+
+> “My Node/Vite app deploys from GitHub but only `git pull` runs. I need a post-deployment script to run `npm ci && npm run build` in my repo path and `rsync` the `dist/` folder into `public_html`. Which UI field should I use on Flexible, and what is the correct absolute path for this application?”
+
+They will give you the exact path string for your server.
 
 ---
 
