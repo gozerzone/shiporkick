@@ -221,6 +221,12 @@ npm run build
 npm run publish:dist
 ```
 
+### `EPERM` when copying **`index.html`** or refreshing **`assets/`**
+
+If **`publish-dist`** or **`cloudways-deploy.sh`** fails with **`EPERM`** on **`index.html`**, you are almost certainly SSH’d as the **`master_...`** system user while **`public_html`** is owned by the **application user** (e.g. **`qereqenxmn`**). The master user often **cannot** create or replace web-root files that the app user owns.
+
+**Fix:** In Cloudways → **Access Details**, open **SSH access** for the **application** (credentials whose username matches the app / folder name), SSH in as **that** user, `cd` to **`public_html`**, then run **`export SHIPORKICK_CLOUDWAYS_DEPLOY=1 && bash ./cloudways-deploy.sh`**. Alternatively use **File Manager** (as the app context) to copy **`dist/index.html`** and **`dist/assets/`** into the web root.
+
 ### `EPERM` when copying `.htaccess`
 
 Some Cloudways stacks **block overwriting** `public_html/.htaccess` from SSH/Node (immutable or platform-owned file). **`publish-dist` still completes** — it copies **`index.html`** and **`assets/`** first, then **warns** if `.htaccess` cannot be written. If the homepage is **blank** and the console shows module scripts with MIME type **`application/octet-stream`**, your web root is missing the **`AddType` / `Header set Content-Type`** rules for **`*.js`**. Copy the **`mod_mime` + `mod_headers` blocks** from the repo’s **`public/.htaccess`** into the existing **`public_html/.htaccess`** via **File Manager** (append or merge), or ask Cloudways to allow the deploy user to overwrite that file. You still need SPA rewrite rules from the same file for deep links.

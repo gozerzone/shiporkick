@@ -38,11 +38,47 @@ if (!distHtml.includes('/assets/')) {
   process.exit(1)
 }
 
-fs.copyFileSync(distIndex, path.join(publishRoot, 'index.html'))
+const outIndex = path.join(publishRoot, 'index.html')
+
+/** Cloudways: `master_*` SSH often cannot write files owned by the application user in public_html. */
+function copyIndexToWebRoot() {
+  try {
+    fs.copyFileSync(distIndex, outIndex)
+    return
+  } catch (first) {
+    try {
+      fs.writeFileSync(outIndex, fs.readFileSync(distIndex))
+      return
+    } catch (second) {
+      const code =
+        (first && typeof first === 'object' && 'code' in first && first.code) ||
+        (second && typeof second === 'object' && 'code' in second && second.code) ||
+        ''
+      console.error(
+        `publish-dist: cannot write index.html (${String(code)}).\n` +
+          'On Cloudways, SSH as the APPLICATION user (Access Details → Application credentials —\n' +
+          'username like your app id, not "master_..."), then run this script again.\n' +
+          'Or copy dist/index.html to the web root in File Manager while logged in as the app owner.',
+      )
+      process.exit(1)
+    }
+  }
+}
+
+copyIndexToWebRoot()
 
 const outAssets = path.join(publishRoot, 'assets')
-fs.rmSync(outAssets, { recursive: true, force: true })
-fs.cpSync(path.join(distDir, 'assets'), outAssets, { recursive: true })
+try {
+  fs.rmSync(outAssets, { recursive: true, force: true })
+  fs.cpSync(path.join(distDir, 'assets'), outAssets, { recursive: true })
+} catch (err) {
+  const code = err && typeof err === 'object' && 'code' in err ? err.code : ''
+  console.error(
+    `publish-dist: cannot refresh assets/ (${String(code)}). ` +
+      'Same fix as index.html: use the Cloudways APPLICATION SSH user, not master.',
+  )
+  process.exit(1)
+}
 
 for (const name of [
   'runtime-config.json',

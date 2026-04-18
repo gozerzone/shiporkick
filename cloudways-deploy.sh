@@ -46,6 +46,14 @@ fi
 
 echo "cloudways-deploy.sh: using $($NODE_BIN -v) in $ROOT"
 
+case "$(whoami 2>/dev/null || true)" in
+  master_*)
+    echo "cloudways-deploy.sh: WARNING — you are $(whoami). Publishing often fails with EPERM because" >&2
+    echo "public_html is owned by the application user. Use SSH with APPLICATION credentials" >&2
+    echo "(Access Details), not the master system user, or use Cloudways Reset Permissions + app-user deploy." >&2
+    ;;
+esac
+
 npm install
 npm run build
 
