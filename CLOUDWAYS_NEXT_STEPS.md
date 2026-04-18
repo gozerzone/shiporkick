@@ -146,7 +146,7 @@ nvm use 22
 
 ### Layout 1 — Git repo files live **directly** in `public_html` (your case: `qereqenxmn`)
 
-Replace the folder name if yours differs.
+Replace the folder name if yours differs. The repo ships **`cloudways-deploy.sh`**: it runs **`npm install` + `npm run build`**, then copies **`dist/`** into the real web root so `index.html` references **`/assets/…`** (a plain Git pull alone restores the dev `index.html` and blanks the site until this runs).
 
 ```bash
 #!/bin/bash
@@ -156,13 +156,8 @@ export NVM_DIR="$HOME/.nvm"
 nvm use 22
 
 cd /home/master/applications/qereqenxmn/public_html
-npm install
-npm run build
-
-cp -f dist/index.html ./index.html
-rm -rf assets
-cp -R dist/assets ./assets
-test -f dist/.htaccess && cp -f dist/.htaccess ./.htaccess || true
+export SHIPORKICK_CLOUDWAYS_DEPLOY=1
+bash ./cloudways-deploy.sh
 ```
 
 ### Layout 2 — Git repo is in a **subfolder** (e.g. `public_html/shiporkick/` has `package.json`)
@@ -175,13 +170,9 @@ export NVM_DIR="$HOME/.nvm"
 nvm use 22
 
 cd /home/master/applications/YOUR_APP_FOLDER/public_html/shiporkick
-npm install
-npm run build
-
-cp -f dist/index.html ../index.html
-rm -rf ../assets
-cp -R dist/assets ../assets
-test -f dist/.htaccess && cp -f dist/.htaccess ../.htaccess || true
+export SHIPORKICK_CLOUDWAYS_DEPLOY=1
+export SHIPORKICK_WEBROOT="$(pwd)/.."
+bash ./cloudways-deploy.sh
 ```
 
 ### After saving the hook

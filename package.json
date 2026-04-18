@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "deploy:cloudways": "bash ./cloudways-deploy.sh",
     "lint": "eslint .",
     "preview": "vite preview"
   },
