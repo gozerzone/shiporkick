@@ -44,7 +44,12 @@ const outAssets = path.join(publishRoot, 'assets')
 fs.rmSync(outAssets, { recursive: true, force: true })
 fs.cpSync(path.join(distDir, 'assets'), outAssets, { recursive: true })
 
-for (const name of ['runtime-config.example.json', 'favicon.svg', 'icons.svg']) {
+for (const name of [
+  'runtime-config.json',
+  'runtime-config.example.json',
+  'favicon.svg',
+  'icons.svg',
+]) {
   const src = path.join(distDir, name)
   if (fs.existsSync(src)) {
     fs.copyFileSync(src, path.join(publishRoot, name))

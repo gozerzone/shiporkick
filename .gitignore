@@ -20,9 +20,6 @@ dist-ssr
 .env.*
 !.env.example
 
-# Local override for runtime JSON (optional)
-public/runtime-config.json
-
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
