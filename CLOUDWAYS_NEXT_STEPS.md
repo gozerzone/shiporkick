@@ -261,12 +261,31 @@ Then in Cloudways: **pull / deploy** again (Step 1).
 
 ---
 
+## 403 Forbidden (response says **nginx**)
+
+Cloudways often puts **Nginx** in front of **Apache**. A **403** here usually means the **Nginx worker cannot read** your web root (or the path is wrong), not a bug in the Vite app.
+
+1. In Cloudways → your application → **Application Settings** (or **Access Details**), use **Reset Permissions** / **Fix Permissions** (wording varies). Run it, wait until it finishes, then reload the site.
+2. Confirm the **domain** points at this application’s **`public_html`** (not an empty folder or a different app).
+3. From SSH, in **`public_html`**:
+
+   ```bash
+   ls -la index.html assets 2>/dev/null | head
+   ```
+
+   You should see **`index.html`** and an **`assets/`** directory after publish. If **`index.html`** is missing, run **`cloudways-deploy.sh`** (with **`SHIPORKICK_CLOUDWAYS_DEPLOY=1`**) or copy **`dist/`** as in Step 3b.
+
+4. If 403 persists, open a ticket and mention **nginx 403** after a deploy — they can check the vhost **`root`** and Nginx error log for **`permission denied`**.
+
+---
+
 ## If you get stuck
 
 Reply with:
 
 1. Whether **Step 2** shows `viewport-fit` or not.
-2. A **screenshot or copy-paste** of your **deployment hook / script** (remove any secrets).
-3. Whether Cloudways shows **Node** version anywhere for that application.
+2. Whether the **403** is on **`/`** only or also on **`/assets/...`** (full URL helps).
+3. A **screenshot or copy-paste** of your **deployment hook / script** (remove any secrets).
+4. Whether Cloudways shows **Node** version anywhere for that application.
 
 Then we can narrow it to “hook wrong” vs “wrong folder” vs “wrong app” in one more round.
