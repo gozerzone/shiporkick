@@ -9,6 +9,10 @@ Battle out for the best and longest work streak. Get it done.
 - LiveKit (`livekit-client`, `@livekit/components-react`)
 - Supabase (`@supabase/supabase-js`)
 
+## Requirements
+
+- **Node.js 22+** (see `.nvmrc`; `package.json` `engines` enforces this for tooling that respects it)
+
 ## Local development
 
 ```bash
