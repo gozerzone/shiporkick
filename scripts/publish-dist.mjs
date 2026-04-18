@@ -45,8 +45,17 @@ fs.rmSync(outAssets, { recursive: true, force: true })
 fs.cpSync(path.join(distDir, 'assets'), outAssets, { recursive: true })
 
 const distHtaccess = path.join(distDir, '.htaccess')
+const outHtaccess = path.join(publishRoot, '.htaccess')
 if (fs.existsSync(distHtaccess)) {
-  fs.copyFileSync(distHtaccess, path.join(publishRoot, '.htaccess'))
+  try {
+    fs.copyFileSync(distHtaccess, outHtaccess)
+  } catch (err) {
+    const code = err && typeof err === 'object' && 'code' in err ? err.code : ''
+    console.warn(
+      `publish-dist: could not write .htaccess (${String(code)}). ` +
+        'Cloudways often locks the web-root file; SPA rewrite rules may already exist. App bundle was published.',
+    )
+  }
 }
 
 const published = fs.readFileSync(path.join(publishRoot, 'index.html'), 'utf8')

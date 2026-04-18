@@ -203,6 +203,10 @@ npm run build
 npm run publish:dist
 ```
 
+### `EPERM` when copying `.htaccess`
+
+Some Cloudways stacks **block overwriting** `public_html/.htaccess` from SSH/Node (immutable or platform-owned file). **`publish-dist` still completes** — it copies **`index.html`** and **`assets/`** first, then **warns** if `.htaccess` cannot be written. The app at `/` should load. If you later need SPA fallbacks from `public/.htaccess`, merge that file’s rules into the existing web-root `.htaccess` using **File Manager** or Cloudways support.
+
 ### After saving the hook
 
 1. Click **Deploy / Pull** once more.
