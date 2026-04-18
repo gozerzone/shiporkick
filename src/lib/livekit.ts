@@ -1,4 +1,5 @@
 import { Room } from 'livekit-client'
+import { getPublicEnv } from './runtimeEnv'
 
 export interface LiveKitSession {
   room: Room
@@ -8,8 +9,8 @@ export interface LiveKitSession {
 }
 
 export function createLiveKitSession(): LiveKitSession {
-  const wsUrl = import.meta.env.VITE_LIVEKIT_URL ?? ''
-  const token = import.meta.env.VITE_LIVEKIT_TOKEN ?? ''
+  const wsUrl = getPublicEnv('VITE_LIVEKIT_URL')
+  const token = getPublicEnv('VITE_LIVEKIT_TOKEN')
   const room = new Room()
 
   return {

@@ -1,0 +1,9 @@
+{
+  "VITE_LIVEKIT_URL": "wss://shiporkick-1bnt2hsb.livekit.cloud",
+  "VITE_LIVEKIT_TOKEN": "",
+  "VITE_LIVEKIT_TOKEN_ENDPOINT": "",
+  "VITE_LIVEKIT_ROOM": "Main",
+  "VITE_SUPABASE_URL": "",
+  "VITE_SUPABASE_ANON_KEY": "",
+  "VITE_CLERK_PUBLISHABLE_KEY": ""
+}

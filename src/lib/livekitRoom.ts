@@ -1,3 +1,5 @@
+import { getPublicEnv } from './runtimeEnv'
+
 /** Sanitized room slug derived from host user id (dynamic rooms / token endpoint flow). */
 export function buildRoomSlug(userId: string): string {
   const sanitized = userId.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-')
@@ -11,19 +13,19 @@ export function buildRoomSlug(userId: string): string {
  * the server can mint per-room tokens; we then use a slug per host user id.
  */
 export function resolveHostRoomName(userId: string): string {
-  const hasEndpoint = Boolean(import.meta.env.VITE_LIVEKIT_TOKEN_ENDPOINT?.trim())
+  const hasEndpoint = Boolean(getPublicEnv('VITE_LIVEKIT_TOKEN_ENDPOINT'))
   if (hasEndpoint) {
     return buildRoomSlug(userId)
   }
-  const fixed = import.meta.env.VITE_LIVEKIT_ROOM?.trim()
+  const fixed = getPublicEnv('VITE_LIVEKIT_ROOM')
   if (fixed) return fixed
   return buildRoomSlug(userId)
 }
 
 export function liveKitStaticTokenNeedsRoomHint(): boolean {
   return Boolean(
-    import.meta.env.VITE_LIVEKIT_TOKEN?.trim() &&
-      !import.meta.env.VITE_LIVEKIT_TOKEN_ENDPOINT?.trim() &&
-      !import.meta.env.VITE_LIVEKIT_ROOM?.trim(),
+    getPublicEnv('VITE_LIVEKIT_TOKEN') &&
+      !getPublicEnv('VITE_LIVEKIT_TOKEN_ENDPOINT') &&
+      !getPublicEnv('VITE_LIVEKIT_ROOM'),
   )
 }

@@ -8,6 +8,7 @@ import { ViewerStage } from './components/ViewerStage'
 import { WastedOverlay } from './components/WastedOverlay'
 import { getAuthContext, type AuthProvider } from './lib/auth'
 import { liveKitStaticTokenNeedsRoomHint } from './lib/livekitRoom'
+import { getPublicEnv } from './lib/runtimeEnv'
 import { subscribeToSessionHealth } from './lib/sessionHealthRealtime'
 import { useStreaming } from './providers/StreamingProvider'
 
@@ -27,9 +28,9 @@ function App() {
   const [isLobbyMode, setIsLobbyMode] = useState(false)
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null)
   const auth = useMemo(() => getAuthContext(authProvider), [authProvider])
-  const hasEndpoint = Boolean(import.meta.env.VITE_LIVEKIT_URL)
+  const hasEndpoint = Boolean(getPublicEnv('VITE_LIVEKIT_URL'))
   const hasTokenFlow = Boolean(
-    import.meta.env.VITE_LIVEKIT_TOKEN_ENDPOINT || import.meta.env.VITE_LIVEKIT_TOKEN,
+    getPublicEnv('VITE_LIVEKIT_TOKEN_ENDPOINT') || getPublicEnv('VITE_LIVEKIT_TOKEN'),
   )
   const liveKitRoomHintNeeded = liveKitStaticTokenNeedsRoomHint()
   const [cooldownRemainingMs, setCooldownRemainingMs] = useState(0)
@@ -172,13 +173,12 @@ function App() {
               value={userId}
               onChange={(event) => setUserId(event.target.value)}
             />
-            <p>Endpoint: {hasEndpoint ? 'READY' : 'Missing VITE_LIVEKIT_URL'}</p>
-            <p>Token flow: {hasTokenFlow ? 'READY' : 'Missing token endpoint/token'}</p>
+            <p>Endpoint: {hasEndpoint ? 'READY' : 'Missing LiveKit URL'}</p>
+            <p>Token flow: {hasTokenFlow ? 'READY' : 'Missing token (add JWT or token endpoint)'}</p>
             {liveKitRoomHintNeeded ? (
               <p className="error">
                 Static LiveKit token in use without VITE_LIVEKIT_ROOM. Set VITE_LIVEKIT_ROOM to the same room name
-                baked into that JWT, or switch to VITE_LIVEKIT_TOKEN_ENDPOINT. Otherwise joins fail or tracks never
-                publish.
+                baked into that JWT (build env or /runtime-config.json), or switch to VITE_LIVEKIT_TOKEN_ENDPOINT.
               </p>
             ) : null}
             <p>Connection: {isConnected ? 'CONNECTED' : 'DISCONNECTED'}</p>

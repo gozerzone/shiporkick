@@ -2,12 +2,22 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import { loadRuntimeConfig } from './lib/runtimeEnv'
 import { StreamingProvider } from './providers/StreamingProvider'
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <StreamingProvider>
-      <App />
-    </StreamingProvider>
-  </StrictMode>,
-)
+const root = document.getElementById('root')
+
+void loadRuntimeConfig()
+  .catch(() => {
+    /* missing/invalid JSON is fine; build-time env + defaults still apply */
+  })
+  .then(() => {
+    if (!root) return
+    createRoot(root).render(
+      <StrictMode>
+        <StreamingProvider>
+          <App />
+        </StreamingProvider>
+      </StrictMode>,
+    )
+  })

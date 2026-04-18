@@ -132,7 +132,7 @@ That often happens when **`npm ci` runs under an old npm/Node** or the server ha
 
 ## Step 3b — Add a deployment hook that builds Vite and publishes `dist/` (you do this)
 
-**Prerequisite:** In Cloudways application settings, define **environment variables** for anything in `.env.example` that starts with `VITE_` (same names). The `npm run build` step reads them.
+**Prerequisite:** Either define **environment variables** in Cloudways for every `VITE_*` key you need (they are baked in at `npm run build`), **or** skip secrets in the panel and ship **`/runtime-config.json`** in **`public_html`** (same folder as `index.html`) so LiveKit + Supabase work **without** rebuilding when you only rotate keys. Copy `public/runtime-config.example.json` from the repo, rename to **`runtime-config.json`**, fill in **`VITE_LIVEKIT_TOKEN`**, **`VITE_LIVEKIT_ROOM`** (must match the JWT room), and your Supabase keys. The app loads this file on startup.
 
 Then, under **Deployment via GIT**, find the field for a **shell script** that runs **after** git pull. Paste a script that matches **your layout**.
 

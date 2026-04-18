@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { supabase } from '../lib/supabaseClient'
+import { getSupabase } from '../lib/supabaseClient'
 
 interface SubmitFoulResult {
   applied: boolean
@@ -30,6 +30,7 @@ export function FoulButton({ sessionId }: FoulButtonProps) {
   const viewerId = useMemo(() => getStableViewerId(), [])
 
   const submitFoul = async () => {
+    const supabase = getSupabase()
     if (!supabase) {
       setMessage('Supabase is not configured.')
       return

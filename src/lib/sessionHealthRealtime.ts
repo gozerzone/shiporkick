@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient'
+import { getSupabase } from './supabaseClient'
 
 interface SessionHealthRow {
   id: string
@@ -9,6 +9,7 @@ export function subscribeToSessionHealth(
   sessionId: string,
   onHealthChange: (health: number) => void,
 ) {
+  const supabase = getSupabase()
   if (!supabase) {
     throw new Error('Supabase client is not configured.')
   }

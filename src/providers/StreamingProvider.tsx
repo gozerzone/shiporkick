@@ -16,6 +16,7 @@ import {
   type ReactNode,
 } from 'react'
 import { resolveHostRoomName } from '../lib/livekitRoom'
+import { getPublicEnv } from '../lib/runtimeEnv'
 import { coerceHttpsUrl, coerceLiveKitServerUrl } from '../lib/secureUrls'
 
 type JoinMode = 'host' | 'viewer'
@@ -35,14 +36,14 @@ interface StreamingContextValue {
 const StreamingContext = createContext<StreamingContextValue | null>(null)
 
 async function requestLiveKitToken(roomName: string, userId: string, mode: JoinMode) {
-  const endpointRaw = import.meta.env.VITE_LIVEKIT_TOKEN_ENDPOINT?.trim()
+  const endpointRaw = getPublicEnv('VITE_LIVEKIT_TOKEN_ENDPOINT')
   const endpoint = endpointRaw ? coerceHttpsUrl(endpointRaw) : ''
-  const fallbackToken = import.meta.env.VITE_LIVEKIT_TOKEN
+  const fallbackToken = getPublicEnv('VITE_LIVEKIT_TOKEN')
 
   if (!endpoint) {
     if (!fallbackToken) {
       throw new Error(
-        'Missing token flow. Set VITE_LIVEKIT_TOKEN_ENDPOINT or VITE_LIVEKIT_TOKEN.',
+        'Missing LiveKit token. Add VITE_LIVEKIT_TOKEN (or VITE_LIVEKIT_TOKEN_ENDPOINT) to .env at build time, or ship /runtime-config.json next to index.html on the server.',
       )
     }
     return fallbackToken
@@ -78,7 +79,7 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
   const publishedAudioRef = useRef<MediaStreamTrack | null>(null)
 
   const wsUrl = useMemo(
-    () => coerceLiveKitServerUrl(import.meta.env.VITE_LIVEKIT_URL?.trim() ?? ''),
+    () => coerceLiveKitServerUrl(getPublicEnv('VITE_LIVEKIT_URL')),
     [],
   )
   const roomCtxValue = useMemo(() => room, [room])
@@ -97,7 +98,9 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
   const connect = useCallback(
     async (nextRoomName: string, userId: string, mode: JoinMode) => {
       if (!wsUrl) {
-        throw new Error('Missing VITE_LIVEKIT_URL')
+        throw new Error(
+          'Missing LiveKit URL. Set VITE_LIVEKIT_URL or override in /runtime-config.json.',
+        )
       }
 
       const token = await requestLiveKitToken(nextRoomName, userId, mode)

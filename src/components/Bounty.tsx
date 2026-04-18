@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { supabase } from '../lib/supabaseClient'
+import { getSupabase } from '../lib/supabaseClient'
 
 interface BountyProps {
   sessionId: string
@@ -41,8 +41,8 @@ export function Bounty({ sessionId }: BountyProps) {
   const viewerId = useMemo(() => getStableViewerId(), [])
 
   useEffect(() => {
-    if (!supabase) return
-    const client = supabase
+    const client = getSupabase()
+    if (!client) return
 
     const load = async () => {
       const { data, error } = await client
@@ -85,11 +85,11 @@ export function Bounty({ sessionId }: BountyProps) {
   }, [sessionId])
 
   const onTip = async () => {
-    if (!supabase) {
+    const client = getSupabase()
+    if (!client) {
       setMessage('Supabase is not configured.')
       return
     }
-    const client = supabase
     setIsSubmitting(true)
     setMessage(null)
 

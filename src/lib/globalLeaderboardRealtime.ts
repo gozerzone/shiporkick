@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient'
+import { getSupabase } from './supabaseClient'
 
 export interface LeaderboardStreamer {
   sessionId: string
@@ -17,6 +17,7 @@ type SessionRow = {
 }
 
 export async function fetchActiveStreamers(): Promise<LeaderboardStreamer[]> {
+  const supabase = getSupabase()
   if (!supabase) {
     return []
   }
@@ -44,6 +45,7 @@ export async function fetchActiveStreamers(): Promise<LeaderboardStreamer[]> {
 }
 
 export function subscribeToLeaderboardRefresh(onRefresh: () => void) {
+  const supabase = getSupabase()
   if (!supabase) {
     return () => {}
   }

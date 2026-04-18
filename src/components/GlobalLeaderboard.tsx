@@ -1,15 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   fetchActiveStreamers,
   subscribeToLeaderboardRefresh,
   type LeaderboardStreamer,
 } from '../lib/globalLeaderboardRealtime'
-
-const supabaseConfigured = Boolean(
-  import.meta.env.VITE_SUPABASE_URL?.trim() && import.meta.env.VITE_SUPABASE_ANON_KEY?.trim(),
-)
+import { getPublicEnv } from '../lib/runtimeEnv'
 
 export function GlobalLeaderboard() {
+  const supabaseConfigured = useMemo(
+    () =>
+      Boolean(getPublicEnv('VITE_SUPABASE_URL') && getPublicEnv('VITE_SUPABASE_ANON_KEY')),
+    [],
+  )
   const [rows, setRows] = useState<LeaderboardStreamer[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -58,7 +60,7 @@ export function GlobalLeaderboard() {
       mounted = false
       if (unsubscribe) unsubscribe()
     }
-  }, [])
+  }, [supabaseConfigured])
 
   return (
     <article className="panel leaderboard">
@@ -67,8 +69,9 @@ export function GlobalLeaderboard() {
 
       {!supabaseConfigured ? (
         <p className="error">
-          Leaderboard offline: set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY at build time, then run SQL
-          migrations in Supabase.
+          Leaderboard offline: set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY for the production build, or add them
+          to <code>/runtime-config.json</code> in the web root, then run SQL migrations in
+          Supabase.
         </p>
       ) : null}
       {loading ? <p>Loading active streamers...</p> : null}

@@ -1,9 +1,20 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { coerceHttpsUrl } from './secureUrls'
+import { getPublicEnv } from './runtimeEnv'
 
-const supabaseUrlRaw = import.meta.env.VITE_SUPABASE_URL?.trim() ?? ''
-const supabaseUrl = supabaseUrlRaw ? coerceHttpsUrl(supabaseUrlRaw) : ''
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+let cached: SupabaseClient | null | undefined
 
-export const supabase =
-  supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null
+export function getSupabase(): SupabaseClient | null {
+  if (cached !== undefined) return cached
+
+  const supabaseUrlRaw = getPublicEnv('VITE_SUPABASE_URL')
+  const supabaseUrl = supabaseUrlRaw ? coerceHttpsUrl(supabaseUrlRaw) : ''
+  const supabaseAnonKey = getPublicEnv('VITE_SUPABASE_ANON_KEY')
+
+  if (supabaseUrl && supabaseAnonKey) {
+    cached = createClient(supabaseUrl, supabaseAnonKey)
+  } else {
+    cached = null
+  }
+  return cached
+}
