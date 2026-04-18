@@ -96,37 +96,93 @@ Do this so we know **which folder** must get `dist/`.
 
 ---
 
+## Step 3a-node — Your server is on Node 18 (required: Node 22)
+
+If `npm run build` prints **“Vite requires Node.js version 20.19+ or 22.12+”** or **`CustomEvent is not defined`**, the server’s default Node is **too old**.
+
+**One-time setup (SSH as `master`, home directory):**
+
+1. Install **nvm** (Cloudways-friendly, no sudo), then Node **22**:
+
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+   source ~/.bashrc
+   nvm install 22
+   nvm alias default 22
+   node -v
+   ```
+
+   You want `node -v` to show **v22.x.x**.
+
+2. If `nvm` is already installed, only run:
+
+   ```bash
+   source ~/.bashrc
+   nvm install 22
+   nvm use 22
+   node -v
+   ```
+
+**Why `npm ci` failed with “Missing … from lock file”**  
+That often happens when **`npm ci` runs under an old npm/Node** or the server had a **stale** `package-lock.json`. After Node 22 is active, use **`npm install`** once in `public_html` (it updates `node_modules` to match the lock more forgivingly). On your laptop, `npm ci` already passes with Node 22+.
+
+**Do not use** `rsync --delete dist/ ./` when the **whole Git repo** lives in `public_html` — it can delete `package.json`, `src/`, etc. Use the **copy commands** below instead.
+
+---
+
 ## Step 3b — Add a deployment hook that builds Vite and publishes `dist/` (you do this)
 
 **Prerequisite:** In Cloudways application settings, define **environment variables** for anything in `.env.example` that starts with `VITE_` (same names). The `npm run build` step reads them.
 
-Then, under **Deployment via GIT**, find the field for a **shell script** that runs **after** git pull. Paste a script that matches **your layout**:
+Then, under **Deployment via GIT**, find the field for a **shell script** that runs **after** git pull. Paste a script that matches **your layout**.
 
-### Layout 1 — Git repo files live **directly** in `public_html` (you see `package.json` next to `index.html` in File Manager)
+Every script should **load nvm** and **`nvm use 22`** before `npm`:
+
+```bash
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+nvm use 22
+```
+
+### Layout 1 — Git repo files live **directly** in `public_html` (your case: `qereqenxmn`)
+
+Replace the folder name if yours differs.
 
 ```bash
 #!/bin/bash
 set -e
-cd /home/master/applications/YOUR_APP_FOLDER/public_html
-npm ci
-npm run build
-rsync -av --delete dist/ ./
-```
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+nvm use 22
 
-Replace `YOUR_APP_FOLDER` with the real folder name under `applications/`.
+cd /home/master/applications/qereqenxmn/public_html
+npm install
+npm run build
+
+cp -f dist/index.html ./index.html
+rm -rf assets
+cp -R dist/assets ./assets
+test -f dist/.htaccess && cp -f dist/.htaccess ./.htaccess || true
+```
 
 ### Layout 2 — Git repo is in a **subfolder** (e.g. `public_html/shiporkick/` has `package.json`)
 
 ```bash
 #!/bin/bash
 set -e
-cd /home/master/applications/YOUR_APP_FOLDER/public_html/shiporkick
-npm ci
-npm run build
-rsync -av --delete dist/ ../
-```
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+nvm use 22
 
-That copies the built site into **`public_html`** one level up.
+cd /home/master/applications/YOUR_APP_FOLDER/public_html/shiporkick
+npm install
+npm run build
+
+cp -f dist/index.html ../index.html
+rm -rf ../assets
+cp -R dist/assets ../assets
+test -f dist/.htaccess && cp -f dist/.htaccess ../.htaccess || true
+```
 
 ### After saving the hook
 
