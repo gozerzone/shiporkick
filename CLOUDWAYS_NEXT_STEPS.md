@@ -205,7 +205,7 @@ npm run publish:dist
 
 ### `EPERM` when copying `.htaccess`
 
-Some Cloudways stacks **block overwriting** `public_html/.htaccess` from SSH/Node (immutable or platform-owned file). **`publish-dist` still completes** — it copies **`index.html`** and **`assets/`** first, then **warns** if `.htaccess` cannot be written. The app at `/` should load. If you later need SPA fallbacks from `public/.htaccess`, merge that file’s rules into the existing web-root `.htaccess` using **File Manager** or Cloudways support.
+Some Cloudways stacks **block overwriting** `public_html/.htaccess` from SSH/Node (immutable or platform-owned file). **`publish-dist` still completes** — it copies **`index.html`** and **`assets/`** first, then **warns** if `.htaccess` cannot be written. If the homepage is **blank** and the console shows module scripts with MIME type **`application/octet-stream`**, your web root is missing the **`AddType` / `Header set Content-Type`** rules for **`*.js`**. Copy the **`mod_mime` + `mod_headers` blocks** from the repo’s **`public/.htaccess`** into the existing **`public_html/.htaccess`** via **File Manager** (append or merge), or ask Cloudways to allow the deploy user to overwrite that file. You still need SPA rewrite rules from the same file for deep links.
 
 ### After saving the hook
 

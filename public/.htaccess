@@ -1,6 +1,16 @@
 # ShipOrKick (Vite SPA) on Apache — e.g. Cloudways public_html
 # Copied to dist/ root on `npm run build`
 
+# Some hosts default unknown extensions to application/octet-stream; browsers refuse <script type="module">.
+<IfModule mod_mime.c>
+  AddType text/javascript .js .mjs
+  AddType text/css .css
+  AddType application/json .json
+  AddType image/svg+xml .svg
+  AddType font/woff2 .woff2
+  AddType font/woff .woff
+</IfModule>
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
@@ -12,7 +22,15 @@
 
 # Hashed Vite assets can cache forever; index.html must stay fresh or users keep an old JS/CSS map.
 <IfModule mod_headers.c>
-  <FilesMatch "\.(js|css|svg|woff2?)$">
+  <FilesMatch "\.(js|mjs)$">
+    Header set Content-Type "text/javascript; charset=utf-8"
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+  <FilesMatch "\.css$">
+    Header set Content-Type "text/css; charset=utf-8"
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+  <FilesMatch "\.(svg|woff2?)$">
     Header set Cache-Control "public, max-age=31536000, immutable"
   </FilesMatch>
   <FilesMatch "^index\.html$">
