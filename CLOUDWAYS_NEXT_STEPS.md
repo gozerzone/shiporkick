@@ -123,6 +123,24 @@ If `npm run build` prints **“Vite requires Node.js version 20.19+ or 22.12+”
    node -v
    ```
 
+### SSH still shows Node 18 (`v18.x.x`) when you run `node -v`
+
+Cloudways’ **non-interactive** SSH often **does not load `~/.bashrc`**, so **`nvm` is never initialized** and **`node`** resolves to the system binary (**Node 18**). The deploy hook is fine because **`cloudways-deploy.sh` sources `nvm.sh` itself**; your **manual** `npm run build` is not.
+
+**Option A — one session (copy/paste before `npm run build`):**
+
+```bash
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+cd /home/master/applications/qereqenxmn/public_html
+nvm install   # reads .nvmrc (22) from the repo
+nvm use
+node -v
+npm run build
+```
+
+**Option B — make every SSH login use Node 22:** append the same `NVM_DIR` + `source nvm.sh` block to **`~/.bashrc`**, then run **`nvm alias default 22`**. Ensure **`~/.bash_profile`** exists and contains **`[ -f ~/.bashrc ] && . ~/.bashrc`** (some hosts only run `.bash_profile` for SSH). Log out and back in; **`which node`** should be under **`~/.nvm/versions/node/`**.
+
 **Why `npm ci` failed with “Missing … from lock file”**  
 That often happens when **`npm ci` runs under an old npm/Node** or the server had a **stale** `package-lock.json`. After Node 22 is active, use **`npm install`** once in `public_html` (it updates `node_modules` to match the lock more forgivingly). On your laptop, `npm ci` already passes with Node 22+.
 

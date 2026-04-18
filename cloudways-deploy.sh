@@ -21,7 +21,14 @@ if [[ -s "$NVM_DIR/nvm.sh" ]]; then
   . "$NVM_DIR/nvm.sh"
 fi
 
+# Ensure Node 22 from .nvmrc (Vite 8 requires 20.19+ / 22.12+). Non-interactive SSH often skips ~/.bashrc,
+# so system Node 18 stays default unless we load nvm here.
 if command -v nvm >/dev/null 2>&1; then
+  if [[ -f "$ROOT/.nvmrc" ]]; then
+    nvm install 2>/dev/null || nvm install 22
+  else
+    nvm install 22 2>/dev/null || true
+  fi
   nvm use 22 2>/dev/null || nvm use default 2>/dev/null || true
 fi
 
