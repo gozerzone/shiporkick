@@ -1,0 +1,67 @@
+# Deploy built `dist/` to Cloudways public_html over SSH (rsync).
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   CLOUDWAYS_SSH_HOST       — SSH hostname from Cloudways (Access Details / Master Credentials).
+#   CLOUDWAYS_SSH_USER       — Use the APPLICATION SSH user (not master_*), or rsync may fail with EPERM.
+#   CLOUDWAYS_SSH_PRIVATE_KEY — PEM for that user (paste full key including BEGIN/END lines).
+#   CLOUDWAYS_WEBROOT        — Absolute path to web root, e.g. /home/master/applications/qereqenxmn/public_html
+#
+# Optional:
+#   CLOUDWAYS_SSH_PORT       — SSH port if not 22 (Cloudways often shows a custom port).
+
+name: Deploy Cloudways
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-cloudways-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - name: Install and build
+        run: npm ci && npm run build
+
+      - name: Verify dist
+        run: |
+          test -f dist/index.html
+          grep -q '/assets/' dist/index.html
+          ! grep -qE "src=['\"]/src/main" dist/index.html
+
+      - name: Deploy rsync
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.CLOUDWAYS_SSH_PRIVATE_KEY }}
+          HOST: ${{ secrets.CLOUDWAYS_SSH_HOST }}
+          USER: ${{ secrets.CLOUDWAYS_SSH_USER }}
+          PORT: ${{ secrets.CLOUDWAYS_SSH_PORT }}
+          WEBROOT: ${{ secrets.CLOUDWAYS_WEBROOT }}
+        run: |
+          set -euo pipefail
+          for v in SSH_PRIVATE_KEY HOST USER WEBROOT; do
+            eval "x=\${$v:-}"
+            if [ -z "$x" ]; then echo "Missing secret: $v" >&2; exit 1; fi
+          done
+          mkdir -p ~/.ssh
+          umask 077
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/cloudways_deploy
+          PORT="${PORT:-22}"
+          RSYNC_RSH="ssh -i ~/.ssh/cloudways_deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -p $PORT"
+          rsync -avz --delete -e "$RSYNC_RSH" ./dist/ "${USER}@${HOST}:${WEBROOT}/"
+          echo "Deployed dist/ → ${WEBROOT}/"
