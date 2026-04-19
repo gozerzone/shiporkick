@@ -231,11 +231,14 @@ If **`publish-dist`** or **`cloudways-deploy.sh`** fails with **`EPERM`** on **`
 
 If **application SSH never works** (firewall, keys, or wrong credentials), publish from your **laptop** and upload through the **Cloudways panel** (no shell write to `public_html` needed).
 
-1. On your Mac, in the project folder (Node 22+):
+1. On your Mac, open **Terminal**, **`cd` into your local clone** (the directory that contains **`package.json`** — not your home folder `~`). Example if the project lives in iCloud/Google Drive:
 
    ```bash
+   cd "/Users/YOURNAME/Library/CloudStorage/GoogleDrive-YOURACCOUNT/My Drive/Tilt Ads/ShipOrKick"
    npm run pack:cloudways
    ```
+
+   Use **Finder → right‑click the ShipOrKick folder → Services / New Terminal at Folder** (or drag the folder onto the Terminal icon) if you do not want to type the path. Node **22+** is required (`node -v`).
 
    That runs **`npm run build`** and writes **`shiporkick-webroot.zip`** in the project root (same layout as **`dist/`**: **`index.html`**, **`assets/`**, **`.htaccess`**, **`runtime-config*.json`**, icons — gitignored, not committed).
 
