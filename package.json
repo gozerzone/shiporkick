@@ -11,6 +11,7 @@
     "build": "tsc -b && vite build",
     "deploy:cloudways": "bash ./cloudways-deploy.sh",
     "publish:dist": "node ./scripts/publish-dist.mjs",
+    "pack:cloudways": "npm run build && node ./scripts/make-deploy-zip.mjs",
     "lint": "eslint .",
     "preview": "vite preview"
   },

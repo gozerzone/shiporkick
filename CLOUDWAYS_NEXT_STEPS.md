@@ -227,6 +227,26 @@ If **`publish-dist`** or **`cloudways-deploy.sh`** fails with **`EPERM`** on **`
 
 **Fix:** In Cloudways → **Access Details**, open **SSH access** for the **application** (credentials whose username matches the app / folder name), SSH in as **that** user, `cd` to **`public_html`**, then run **`export SHIPORKICK_CLOUDWAYS_DEPLOY=1 && bash ./cloudways-deploy.sh`**. Alternatively use **File Manager** (as the app context) to copy **`dist/index.html`** and **`dist/assets/`** into the web root.
 
+### Deploy without application SSH (zip + File Manager)
+
+If **application SSH never works** (firewall, keys, or wrong credentials), publish from your **laptop** and upload through the **Cloudways panel** (no shell write to `public_html` needed).
+
+1. On your Mac, in the project folder (Node 22+):
+
+   ```bash
+   npm run pack:cloudways
+   ```
+
+   That runs **`npm run build`** and writes **`shiporkick-webroot.zip`** in the project root (same layout as **`dist/`**: **`index.html`**, **`assets/`**, **`.htaccess`**, **`runtime-config*.json`**, icons — gitignored, not committed).
+
+2. In Cloudways → your application → **File Manager** → open **`public_html`**.
+
+3. **Upload** **`shiporkick-webroot.zip`**, then use **Extract** / **Unzip here** and choose **overwrite** when asked. You should end up with a fresh **`index.html`** and **`assets/`** at the root of **`public_html`**.
+
+4. Purge **Varnish / CDN** if the site still serves an old **`index.html`**.
+
+Re-run **`npm run pack:cloudways`** whenever you need a new production build; the zip name stays the same so re-uploading is predictable.
+
 ### `EPERM` when copying `.htaccess`
 
 Some Cloudways stacks **block overwriting** `public_html/.htaccess` from SSH/Node (immutable or platform-owned file). **`publish-dist` still completes** — it copies **`index.html`** and **`assets/`** first, then **warns** if `.htaccess` cannot be written. If the homepage is **blank** and the console shows module scripts with MIME type **`application/octet-stream`**, your web root is missing the **`AddType` / `Header set Content-Type`** rules for **`*.js`**. Copy the **`mod_mime` + `mod_headers` blocks** from the repo’s **`public/.htaccess`** into the existing **`public_html/.htaccess`** via **File Manager** (append or merge), or ask Cloudways to allow the deploy user to overwrite that file. You still need SPA rewrite rules from the same file for deep links.
