@@ -22,6 +22,12 @@ fs.rmSync(staging, { recursive: true, force: true })
 fs.mkdirSync(staging, { recursive: true })
 fs.cpSync(distDir, staging, { recursive: true })
 
+// SFTP and some zip UIs skip dotfiles; duplicate under a visible name for manual rename → `.htaccess`
+const htDot = path.join(staging, '.htaccess')
+if (fs.existsSync(htDot)) {
+  fs.copyFileSync(htDot, path.join(staging, 'apache.htaccess'))
+}
+
 fs.rmSync(outZip, { force: true })
 
 try {
@@ -39,5 +45,5 @@ fs.rmSync(staging, { recursive: true, force: true })
 const stat = fs.statSync(outZip)
 console.log(
   `make-deploy-zip: wrote ${outZip} (${Math.round(stat.size / 1024)} KB)\n` +
-    'Upload this zip in Cloudways File Manager → open public_html → Upload → Extract here (overwrite).',
+    'Upload / extract (or SFTP the folder). If `.htaccess` is missing on the server, rename `apache.htaccess` → `.htaccess` in public_html (many clients hide dotfiles).',
 )

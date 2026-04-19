@@ -253,7 +253,7 @@ Try: **Servers** → your server → **Manage** → select the **application** �
 3. On your Mac, install **Cyberduck** (free) or **FileZilla**.
 4. **Double‑click `shiporkick-webroot.zip` in Finder** to unzip it into a folder (e.g. **`webroot`**).
 5. Connect SFTP to the host, go to **`public_html`** (full path is often under **`applications/<appid>/public_html`** for master user).
-6. **Upload** the **contents** of the unzipped folder: **`index.html`**, the whole **`assets`** folder (replace the old one: delete remote **`assets`** first or merge and overwrite files), **`.htaccess`**, **`runtime-config.json`**, **`favicon.svg`**, etc.
+6. **Upload** the **contents** of the unzipped folder: **`index.html`**, the whole **`assets`** folder (replace the old one: delete remote **`assets`** first or merge and overwrite files), **`runtime-config.json`**, **`favicon.svg`**, etc. The zip also includes **`.htaccess`** and a duplicate **`apache.htaccess`** (same file). Many SFTP clients **omit dotfiles** when dragging folders — if **`.htaccess`** never appears on the server, **rename** **`apache.htaccess`** to **`.htaccess`** in **`public_html`** (same content).
 
    SFTP clients usually **cannot unzip on the server**; uploading the **extracted** files avoids that.
 
