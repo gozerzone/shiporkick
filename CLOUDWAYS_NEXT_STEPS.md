@@ -150,7 +150,11 @@ That often happens when **`npm ci` runs under an old npm/Node** or the server ha
 
 ## Step 3b — Add a deployment hook that builds Vite and publishes `dist/` (you do this)
 
-**Prerequisite:** Either define **environment variables** in Cloudways for every `VITE_*` key you need (they are baked in at `npm run build`), **or** skip secrets in the panel and ship **`/runtime-config.json`** in **`public_html`** (same folder as `index.html`) so LiveKit + Supabase work **without** rebuilding when you only rotate keys. Copy `public/runtime-config.example.json` from the repo, rename to **`runtime-config.json`**, fill in **`VITE_LIVEKIT_TOKEN`**, **`VITE_LIVEKIT_ROOM`** (must match the JWT room), and your Supabase keys. The app loads this file on startup.
+**Prerequisite:** Either define **environment variables** in Cloudways for every `VITE_*` key you need (they are baked in at `npm run build`), **or** skip secrets in the panel and ship **`/runtime-config.json`** in **`public_html`** (same folder as `index.html`) so LiveKit + Supabase work **without** rebuilding when you only rotate keys. Copy `public/runtime-config.example.json` from the repo, rename to **`runtime-config.json`**, fill in **`VITE_LIVEKIT_TOKEN`**, **`VITE_LIVEKIT_ROOM`** (must match the JWT room), and your Supabase keys. The app loads this file on startup (and a duplicate **`shiporkick-runtime.json`** with the same keys — see below if the first URL **404**s).
+
+#### If `https://yoursite.com/runtime-config.json` returns **404** but the file is on disk
+
+Some Cloudways / Nginx setups mishandle that path. Ensure **`runtime-config.json`** sits in **`public_html`** next to **`index.html`**, then: (1) update **`.htaccess`** from the latest repo **`public/.htaccess`** (it must **not** SPA-fallback JSON to **`index.html`**), (2) purge **Varnish/CDN**, (3) open **`/shiporkick-runtime.json`** — the app tries that URL second with the **same** JSON. After **`npm run build`**, **`dist/`** contains both files; upload **`shiporkick-runtime.json`** even if **`runtime-config.json`** 404s in the browser.
 
 Then, under **Deployment via GIT**, find the field for a **shell script** that runs **after** git pull. Paste a script that matches **your layout**.
 

@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "postbuild": "node ./scripts/sync-runtime-alias.mjs",
     "deploy:cloudways": "bash ./cloudways-deploy.sh",
     "publish:dist": "node ./scripts/publish-dist.mjs",
     "pack:cloudways": "npm run build && node ./scripts/make-deploy-zip.mjs",

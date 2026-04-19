@@ -82,6 +82,7 @@ try {
 
 for (const name of [
   'runtime-config.json',
+  'shiporkick-runtime.json',
   'runtime-config.example.json',
   'favicon.svg',
   'icons.svg',

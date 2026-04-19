@@ -45,5 +45,6 @@ fs.rmSync(staging, { recursive: true, force: true })
 const stat = fs.statSync(outZip)
 console.log(
   `make-deploy-zip: wrote ${outZip} (${Math.round(stat.size / 1024)} KB)\n` +
-    'Upload / extract (or SFTP the folder). If `.htaccess` is missing on the server, rename `apache.htaccess` → `.htaccess` in public_html (many clients hide dotfiles).',
+    'Upload / extract (or SFTP the folder). If `.htaccess` is missing, rename `apache.htaccess` → `.htaccess`. ' +
+    'If `/runtime-config.json` 404s on the host, upload `shiporkick-runtime.json` too (same JSON); the app tries both.',
 )

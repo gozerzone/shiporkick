@@ -15,6 +15,9 @@
   RewriteEngine On
   RewriteBase /
   RewriteRule ^index\.html$ - [L]
+  # Do not SPA-fallback these; some stacks must serve the real file for fetch() to work.
+  RewriteRule ^runtime-config\.json$ - [L]
+  RewriteRule ^shiporkick-runtime\.json$ - [L]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule . /index.html [L]

@@ -1,6 +1,7 @@
 /**
- * Merges optional `/runtime-config.json` (same origin, next to index.html on Cloudways)
- * with Vite `import.meta.env` so production works without rebuilding when only JSON changes.
+ * Merges optional runtime JSON (same origin, next to index.html on Cloudways) with Vite
+ * `import.meta.env`. Tries `/runtime-config.json` then `/shiporkick-runtime.json` (identical
+ * copy) because some stacks incorrectly 404 the first path.
  *
  * ShipOrKick LiveKit Cloud host is safe to default; JWT and DB keys must still be supplied.
  */
@@ -40,18 +41,23 @@ function buildMerged(): Record<string, string> {
 }
 
 /** Call once before React root mounts (see main.tsx). */
+const RUNTIME_JSON_PATHS = ['/runtime-config.json', '/shiporkick-runtime.json']
+
 export async function loadRuntimeConfig(): Promise<void> {
   merged = null
   runtimePayload = {}
   try {
-    const res = await fetch(`/runtime-config.json?${Date.now()}`, { cache: 'no-store' })
-    if (!res.ok) return
+    for (const basePath of RUNTIME_JSON_PATHS) {
+      const res = await fetch(`${basePath}?${Date.now()}`, { cache: 'no-store' })
+      if (!res.ok) continue
 
-    const json = (await res.json()) as Record<string, unknown>
-    for (const [k, v] of Object.entries(json)) {
-      if (ALLOWED_KEYS.has(k) && typeof v === 'string') {
-        runtimePayload[k] = v.trim()
+      const json = (await res.json()) as Record<string, unknown>
+      for (const [k, v] of Object.entries(json)) {
+        if (ALLOWED_KEYS.has(k) && typeof v === 'string') {
+          runtimePayload[k] = v.trim()
+        }
       }
+      break
     }
   } catch {
     /* missing file or invalid JSON — use build/env only */
