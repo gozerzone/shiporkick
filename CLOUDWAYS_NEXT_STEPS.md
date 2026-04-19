@@ -7,6 +7,24 @@
 
 ---
 
+## Fast path — Git only (recommended: you push, Cloudways builds)
+
+**What you get:** After a **one-time** hook setup, you do **not** SSH for each release: **`git push origin main`** on your Mac → Cloudways **Pull / Deploy** → a **post-deployment script** runs **`cloudways-deploy.sh`** → **`npm install` + `npm run build` + publish** into **`public_html`**.
+
+### One-time setup (do once)
+
+1. **Install Node 22 via nvm** for the **Linux user that runs the Git hook** (usually **`master_…`**). Follow **Step 3a-node** below (`nvm install 22`, etc.).
+2. Cloudways → your application → **Deployment via GIT** → find the **post-deployment / “Execute script after pull”** field (wording varies).
+3. Paste the **Layout 1** script from **Step 3b** (same doc): it must **`source` nvm**, **`cd`** into **your** app’s **`public_html`**, set **`export SHIPORKICK_CLOUDWAYS_DEPLOY=1`**, then **`bash ./cloudways-deploy.sh`**.
+4. Run **Deploy / Pull** once and open the **deployment log**. You want **`cloudways-deploy.sh: using v22…`** and **`publish-dist: OK`** at the end.
+5. **If you see `EPERM` on `index.html` or `assets/`** in the log, the hook runs as **`master_…`** but **`public_html` is owned by the application user** — the script cannot overwrite the live web root. **Fix:** ask Cloudways support to run the hook as the **application** user, or keep using **`npm run pack:cloudways` + SFTP** from your Mac (see **Deploy without application SSH** below).
+
+### Every release after that
+
+On your Mac: **`git push origin main`** → Cloudways **Pull** (or enable auto-deploy). Fix secrets in **`public/runtime-config.json`** (committed) or **`public_html/runtime-config.json`** on the server, or set **`VITE_*`** in Cloudways app env if you prefer build-time inlining.
+
+---
+
 ## Diagnosis (if View Source still has NO `viewport-fit`)
 
 That means **GitHub is ahead of what `shiporkick.com` is serving**.
@@ -67,7 +85,7 @@ Do this so we know **which folder** must get `dist/`.
 5. Search inside that file for **`viewport-fit`**.
    - **If it is missing** here too, then **`public_html/index.html` was never replaced** after your Git deploy. That confirms the problem is **build / copy**, not your laptop.
 
-### Option B — SSH (if you use the terminal)
+### SSH — find paths on the terminal (if you use SSH)
 
 1. Cloudways → **Master Credentials** / **SSH** → connect with the credentials they show.
 2. Run:
@@ -149,6 +167,8 @@ That often happens when **`npm ci` runs under an old npm/Node** or the server ha
 ---
 
 ## Step 3b — Add a deployment hook that builds Vite and publishes `dist/` (you do this)
+
+This is the **shell script** behind the **Fast path — Git only** section above.
 
 **Prerequisite:** Either define **environment variables** in Cloudways for every `VITE_*` key you need (they are baked in at `npm run build`), **or** skip secrets in the panel and ship **`/runtime-config.json`** in **`public_html`** (same folder as `index.html`) so LiveKit + Supabase work **without** rebuilding when you only rotate keys. Copy `public/runtime-config.example.json` from the repo, rename to **`runtime-config.json`**, fill in **`VITE_LIVEKIT_TOKEN`**, **`VITE_LIVEKIT_ROOM`** (must match the JWT room), and your Supabase keys. The app loads this file on startup (and a duplicate **`shiporkick-runtime.json`** with the same keys — see below if the first URL **404**s).
 
