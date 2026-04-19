@@ -225,34 +225,47 @@ npm run publish:dist
 
 If **`publish-dist`** or **`cloudways-deploy.sh`** fails with **`EPERM`** on **`index.html`**, you are almost certainly SSH’d as the **`master_...`** system user while **`public_html`** is owned by the **application user** (e.g. **`qereqenxmn`**). The master user often **cannot** create or replace web-root files that the app user owns.
 
-**Fix:** In Cloudways → **Access Details**, open **SSH access** for the **application** (credentials whose username matches the app / folder name), SSH in as **that** user, `cd` to **`public_html`**, then run **`export SHIPORKICK_CLOUDWAYS_DEPLOY=1 && bash ./cloudways-deploy.sh`**. Alternatively use **File Manager** (as the app context) to copy **`dist/index.html`** and **`dist/assets/`** into the web root.
+**Fix:** In Cloudways → **Access Details**, open **SSH access** for the **application** (credentials whose username matches the app / folder name), SSH in as **that** user, `cd` to **`public_html`**, then run **`export SHIPORKICK_CLOUDWAYS_DEPLOY=1 && bash ./cloudways-deploy.sh`**. If you cannot use that SSH account, use **SFTP** or the **zip upload** flow below instead of trying to **`cp`** files as **`master_...`**.
 
-### Deploy without application SSH (zip + File Manager)
+### Deploy without application SSH (zip → SFTP or File Manager)
 
-If **application SSH never works** (firewall, keys, or wrong credentials), publish from your **laptop** and upload through the **Cloudways panel** (no shell write to `public_html` needed).
+Many accounts **do not show a “File Manager”** button (or it moved under a different menu after Cloudways / DigitalOcean UI changes). **SFTP is the supported default** for moving files. Same idea: build a zip on your Mac, then put those files into **`public_html`**.
 
-1. On your Mac, open **Terminal**, **`cd` into your local clone** (the directory that contains **`package.json`** — not your home folder `~`). Example if the project lives in iCloud/Google Drive:
+#### 1) Build the zip on your Mac (Node 22+)
 
-   ```bash
-   cd "/Users/YOURNAME/Library/CloudStorage/GoogleDrive-YOURACCOUNT/My Drive/Tilt Ads/ShipOrKick"
-   npm run pack:cloudways
-   ```
+```bash
+cd /folder/where/your/clone/lives/ShipOrKick
+npm run pack:cloudways
+```
 
-   Use **Finder → right‑click the ShipOrKick folder → Services / New Terminal at Folder** (or drag the folder onto the Terminal icon) if you do not want to type the path. Node **22+** is required (`node -v`).
+(`ShipOrKick` is the directory that contains **`package.json`**.)
 
-   That runs **`npm run build`** and writes **`shiporkick-webroot.zip`** in the project root (same layout as **`dist/`**: **`index.html`**, **`assets/`**, **`.htaccess`**, **`runtime-config*.json`**, icons — gitignored, not committed).
+That creates **`shiporkick-webroot.zip`** next to **`package.json`** (gitignored). It contains **`index.html`**, **`assets/`**, **`.htaccess`**, **`runtime-config*.json`**, icons — ready to drop on the server.
 
-2. In Cloudways → your application → **File Manager** → open **`public_html`**.
+#### 2a) If you **do** see File Manager
 
-3. **Upload** **`shiporkick-webroot.zip`**, then use **Extract** / **Unzip here** and choose **overwrite** when asked. You should end up with a fresh **`index.html`** and **`assets/`** at the root of **`public_html`**.
+Try: **Servers** → your server → **Manage** → select the **application** → **Application Management** / **Access Details** → look for **Launch** next to **File Manager** (wording varies). Open **`public_html`**, upload the zip, **Extract here**, overwrite.
 
-4. Purge **Varnish / CDN** if the site still serves an old **`index.html`**.
+#### 2b) If you **do not** see File Manager — use **SFTP** (recommended)
 
-Re-run **`npm run pack:cloudways`** whenever you need a new production build; the zip name stays the same so re-uploading is predictable.
+1. Cloudways → **your application** → **Access Details** (or **SSH / SFTP**).
+2. Note **host** (server IP), **port** (often **22**), **username**, **password** — use **application** SFTP credentials if available (same user that owns **`public_html`**), otherwise **master** credentials and navigate into **`applications/…/public_html`**.
+3. On your Mac, install **Cyberduck** (free) or **FileZilla**.
+4. **Double‑click `shiporkick-webroot.zip` in Finder** to unzip it into a folder (e.g. **`webroot`**).
+5. Connect SFTP to the host, go to **`public_html`** (full path is often under **`applications/<appid>/public_html`** for master user).
+6. **Upload** the **contents** of the unzipped folder: **`index.html`**, the whole **`assets`** folder (replace the old one: delete remote **`assets`** first or merge and overwrite files), **`.htaccess`**, **`runtime-config.json`**, **`favicon.svg`**, etc.
+
+   SFTP clients usually **cannot unzip on the server**; uploading the **extracted** files avoids that.
+
+#### 3) Purge cache
+
+Purge **Varnish / CDN** if the browser still shows an old **`index.html`**.
+
+Re-run **`npm run pack:cloudways`** whenever you need a new production build.
 
 ### `EPERM` when copying `.htaccess`
 
-Some Cloudways stacks **block overwriting** `public_html/.htaccess` from SSH/Node (immutable or platform-owned file). **`publish-dist` still completes** — it copies **`index.html`** and **`assets/`** first, then **warns** if `.htaccess` cannot be written. If the homepage is **blank** and the console shows module scripts with MIME type **`application/octet-stream`**, your web root is missing the **`AddType` / `Header set Content-Type`** rules for **`*.js`**. Copy the **`mod_mime` + `mod_headers` blocks** from the repo’s **`public/.htaccess`** into the existing **`public_html/.htaccess`** via **File Manager** (append or merge), or ask Cloudways to allow the deploy user to overwrite that file. You still need SPA rewrite rules from the same file for deep links.
+Some Cloudways stacks **block overwriting** `public_html/.htaccess` from SSH/Node (immutable or platform-owned file). **`publish-dist` still completes** — it copies **`index.html`** and **`assets/`** first, then **warns** if `.htaccess` cannot be written. If the homepage is **blank** and the console shows module scripts with MIME type **`application/octet-stream`**, your web root is missing the **`AddType` / `Header set Content-Type`** rules for **`*.js`**. Copy the **`mod_mime` + `mod_headers` blocks** from the repo’s **`public/.htaccess`** into the existing **`public_html/.htaccess`** via **SFTP** (download, edit, re-upload) or **File Manager** if you have it, or ask Cloudways to allow the deploy user to overwrite that file. You still need SPA rewrite rules from the same file for deep links.
 
 ### After saving the hook
 
