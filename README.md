@@ -22,7 +22,22 @@ cp .env.example .env
 npm run dev
 ```
 
-Apply SQL in `supabase/migrations/` in your Supabase project (SQL Editor or Supabase CLI).
+Apply SQL in `supabase/migrations/` **in filename order** in the Supabase **SQL Editor** (or `supabase db push`):
+
+1. `20260417_accountability_engine.sql` — `profiles`, `sessions`, RLS, realtime  
+2. `20260417_sessions_vouch_count.sql` — `vouch_count` on `sessions`  
+3. `20260417_accountability_bonds.sql` — bounty columns + `bounty_tips`  
+4. `20260417_foul_button_rpc.sql` — foul RPC + `foul_events`  
+5. `20260422_leaderboard_public_read.sql` — anon can read active sessions for the leaderboard  
+
+The UI does **not** yet create a `sessions` row when you go live; until that exists, the leaderboard can be empty even when SQL is applied. Optional smoke test in **SQL Editor**:
+
+```sql
+insert into public.profiles (username) values ('test_streamer') returning id;
+-- paste returned id:
+insert into public.sessions (user_id, task_description, current_health, vouch_count)
+values ('PASTE_PROFILE_UUID', 'Smoke test quest', 100, 0);
+```
 
 ## Build
 
