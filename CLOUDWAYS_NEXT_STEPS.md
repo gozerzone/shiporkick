@@ -15,7 +15,7 @@
 
 1. **Install Node 22 via nvm** for the **Linux user that runs the Git hook** (usually **`master_…`**). Follow **Step 3a-node** below (`nvm install 22`, etc.).
 2. Cloudways → your application → **Deployment via GIT** → find the **post-deployment / “Execute script after pull”** field (wording varies).
-3. Paste the **Layout 1** script from **Step 3b** (same doc): it must **`source` nvm**, **`cd`** into **your** app’s **`public_html`**, set **`export SHIPORKICK_CLOUDWAYS_DEPLOY=1`**, then **`bash ./cloudways-deploy.sh`**.
+3. Paste the **Layout 1** hook from **Step 3b** (same doc). Easiest: **`bash ./cloudways-post-pull.sh`** (repo file next to `cloudways-deploy.sh`), or the absolute-path variant if the panel’s cwd is not `public_html`.
 4. Run **Deploy / Pull** once and open the **deployment log**. You want **`cloudways-deploy.sh: using v22…`** and **`publish-dist: OK`** at the end.
 5. **If you see `EPERM` on `index.html` or `assets/`** in the log, the hook runs as **`master_…`** but **`public_html` is owned by the application user** — the script cannot overwrite the live web root. **Fix:** ask Cloudways support to run the hook as the **application** user, or keep using **`npm run pack:cloudways` + SFTP** from your Mac (see **Deploy without application SSH** below).
 
@@ -188,7 +188,23 @@ nvm use 22
 
 ### Layout 1 — Git repo files live **directly** in `public_html` (your case: `qereqenxmn`)
 
-Replace the folder name if yours differs. The repo ships **`cloudways-deploy.sh`**: it runs **`npm install` + `npm run build`**, then copies **`dist/`** into the real web root so `index.html` references **`/assets/…`** (a plain Git pull alone restores the dev `index.html` and blanks the site until this runs).
+Replace the folder name if yours differs. The repo ships **`cloudways-deploy.sh`** (build + publish) and **`cloudways-post-pull.sh`** (loads nvm, sets `SHIPORKICK_CLOUDWAYS_DEPLOY=1`, then runs deploy). A plain Git pull restores the dev **`index.html`** (`/src/main.tsx`) until this runs.
+
+**Preferred — post-deployment script (pick one):**
+
+```bash
+bash ./cloudways-post-pull.sh
+```
+
+(Use this when Cloudways runs the hook with **current directory = `public_html`** after the pull — the usual default.)
+
+**If the panel does not use `public_html` as cwd**, call the script by absolute path (copy from **Access Details → SSH** / your app’s `public_html` path):
+
+```bash
+bash /home/master/applications/qereqenxmn/public_html/cloudways-post-pull.sh
+```
+
+**Equivalent manual block** (same as before, if you prefer not to use `cloudways-post-pull.sh`):
 
 ```bash
 #!/bin/bash
