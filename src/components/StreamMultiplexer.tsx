@@ -16,23 +16,24 @@ const CAMERA_SIZE = 170
 
 function waitVideoReady(video: HTMLVideoElement, label: string, timeoutMs = 25000): Promise<void> {
   return new Promise((resolve, reject) => {
+    let timer: ReturnType<typeof window.setTimeout> | undefined
+    const cleanup = () => {
+      if (timer !== undefined) {
+        window.clearTimeout(timer)
+        timer = undefined
+      }
+      video.removeEventListener('loadedmetadata', onMeta)
+      video.removeEventListener('resize', onResize)
+    }
     const finish = () => {
       if (video.videoWidth > 0 && video.videoHeight > 0) {
         cleanup()
         resolve()
       }
     }
-    const cleanup = () => {
-      window.clearTimeout(timer)
-      video.removeEventListener('loadedmetadata', onMeta)
-      video.removeEventListener('resize', onResize)
-    }
     const onMeta = () => finish()
     const onResize = () => finish()
-    video.addEventListener('loadedmetadata', onMeta)
-    video.addEventListener('resize', onResize)
-    finish()
-    const timer = window.setTimeout(() => {
+    timer = window.setTimeout(() => {
       cleanup()
       reject(
         new Error(
@@ -40,6 +41,9 @@ function waitVideoReady(video: HTMLVideoElement, label: string, timeoutMs = 2500
         ),
       )
     }, timeoutMs)
+    video.addEventListener('loadedmetadata', onMeta)
+    video.addEventListener('resize', onResize)
+    finish()
   })
 }
 
