@@ -13,6 +13,7 @@
     "deploy:cloudways": "bash ./cloudways-deploy.sh",
     "publish:dist": "node ./scripts/publish-dist.mjs",
     "pack:cloudways": "npm run build && node ./scripts/make-deploy-zip.mjs",
+    "mint:livekit-token": "node ./scripts/mint-livekit-token.mjs",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -36,6 +37,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
+    "livekit-server-sdk": "^2.15.1",
     "postcss": "^8.5.10",
     "tailwindcss": "^4.2.2",
     "typescript": "~6.0.2",
