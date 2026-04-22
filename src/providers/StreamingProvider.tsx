@@ -15,6 +15,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { readJwtExpUnix } from '../lib/jwtPayload'
 import { resolveHostRoomName } from '../lib/livekitRoom'
 import { getPublicEnv } from '../lib/runtimeEnv'
 import { coerceHttpsUrl, coerceLiveKitServerUrl } from '../lib/secureUrls'
@@ -44,6 +45,13 @@ async function requestLiveKitToken(roomName: string, userId: string, mode: JoinM
     if (!fallbackToken) {
       throw new Error(
         'Missing LiveKit token. Add VITE_LIVEKIT_TOKEN (or VITE_LIVEKIT_TOKEN_ENDPOINT) to .env at build time, or ship /runtime-config.json next to index.html on the server.',
+      )
+    }
+    const exp = readJwtExpUnix(fallbackToken)
+    const skewSec = 60
+    if (exp !== null && exp <= Math.floor(Date.now() / 1000) + skewSec) {
+      throw new Error(
+        'LiveKit token (VITE_LIVEKIT_TOKEN) is expired. Mint a new one: LIVEKIT_API_KEY=… LIVEKIT_API_SECRET=… npm run mint:livekit-token — then put the JWT in public/runtime-config.json or web-root runtime-config.json and redeploy.',
       )
     }
     return fallbackToken
