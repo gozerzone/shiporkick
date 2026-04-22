@@ -7,11 +7,14 @@ import { StreamingProvider } from './providers/StreamingProvider'
 
 const root = document.getElementById('root')
 
-void loadRuntimeConfig()
-  .catch(() => {
+void Promise.race([
+  loadRuntimeConfig().catch(() => {
     /* missing/invalid JSON is fine; build-time env + defaults still apply */
-  })
-  .then(() => {
+  }),
+  new Promise<void>((resolve) => {
+    window.setTimeout(resolve, 10000)
+  }),
+]).then(() => {
     if (!root) return
     createRoot(root).render(
       <StrictMode>

@@ -1,6 +1,9 @@
 /**
  * Copy Vite dist/ into the Apache web root (same directory as package.json by default).
  * Requires SHIPORKICK_CLOUDWAYS_DEPLOY=1 so local dev does not overwrite index.html by mistake.
+ *
+ * Order matters: refresh `assets/` *before* replacing `index.html`, otherwise visitors briefly
+ * get new HTML pointing at new hashed bundles that are not on disk yet (white page).
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -39,6 +42,19 @@ if (!distHtml.includes('/assets/')) {
 }
 
 const outIndex = path.join(publishRoot, 'index.html')
+const outAssets = path.join(publishRoot, 'assets')
+
+try {
+  fs.rmSync(outAssets, { recursive: true, force: true })
+  fs.cpSync(path.join(distDir, 'assets'), outAssets, { recursive: true })
+} catch (err) {
+  const code = err && typeof err === 'object' && 'code' in err ? err.code : ''
+  console.error(
+    `publish-dist: cannot refresh assets/ (${String(code)}). ` +
+      'On Cloudways, SSH as the APPLICATION user (Access Details), not master_…',
+  )
+  process.exit(1)
+}
 
 /** Cloudways: `master_*` SSH often cannot write files owned by the application user in public_html. */
 function copyIndexToWebRoot() {
@@ -66,19 +82,6 @@ function copyIndexToWebRoot() {
 }
 
 copyIndexToWebRoot()
-
-const outAssets = path.join(publishRoot, 'assets')
-try {
-  fs.rmSync(outAssets, { recursive: true, force: true })
-  fs.cpSync(path.join(distDir, 'assets'), outAssets, { recursive: true })
-} catch (err) {
-  const code = err && typeof err === 'object' && 'code' in err ? err.code : ''
-  console.error(
-    `publish-dist: cannot refresh assets/ (${String(code)}). ` +
-      'Same fix as index.html: use the Cloudways APPLICATION SSH user, not master.',
-  )
-  process.exit(1)
-}
 
 for (const name of [
   'runtime-config.json',
@@ -111,6 +114,20 @@ const published = fs.readFileSync(path.join(publishRoot, 'index.html'), 'utf8')
 if (!published.includes('/assets/')) {
   console.error('publish-dist: published index.html has no /assets/.')
   process.exit(1)
+}
+
+const assetRefs = new Set(
+  [...published.matchAll(/["'](\/assets\/[^"']+)["']/g)].map((m) => m[1]),
+)
+for (const ref of assetRefs) {
+  const rel = ref.startsWith('/') ? ref.slice(1) : ref
+  const fp = path.join(publishRoot, rel)
+  if (!fs.existsSync(fp)) {
+    console.error(
+      `publish-dist: index.html references ${ref} but that file is missing under ${publishRoot}.`,
+    )
+    process.exit(1)
+  }
 }
 
 console.log(`publish-dist: OK — published into ${publishRoot}`)

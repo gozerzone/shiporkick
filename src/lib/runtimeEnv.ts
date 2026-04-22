@@ -43,12 +43,27 @@ function buildMerged(): Record<string, string> {
 /** Call once before React root mounts (see main.tsx). */
 const RUNTIME_JSON_PATHS = ['/runtime-config.json', '/shiporkick-runtime.json']
 
+const RUNTIME_FETCH_MS = 6000
+
+function fetchRuntimeJson(url: string): Promise<Response> {
+  const controller = new AbortController()
+  const timer = window.setTimeout(() => controller.abort(), RUNTIME_FETCH_MS)
+  return fetch(`${url}?${Date.now()}`, { cache: 'no-store', signal: controller.signal }).finally(() =>
+    window.clearTimeout(timer),
+  )
+}
+
 export async function loadRuntimeConfig(): Promise<void> {
   merged = null
   runtimePayload = {}
   try {
     for (const basePath of RUNTIME_JSON_PATHS) {
-      const res = await fetch(`${basePath}?${Date.now()}`, { cache: 'no-store' })
+      let res: Response
+      try {
+        res = await fetchRuntimeJson(basePath)
+      } catch {
+        continue
+      }
       if (!res.ok) continue
 
       const json = (await res.json()) as Record<string, unknown>

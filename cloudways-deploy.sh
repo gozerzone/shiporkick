@@ -4,6 +4,7 @@
 #
 # Pull replaces index.html with the Vite *source* file (script src=/src/main.tsx). This script
 # rebuilds and copies dist/ back into the web root so the live site loads hashed /assets/* bundles.
+# publish-dist.mjs copies assets/ before index.html to avoid a brief window where new HTML 404s JS.
 
 set -euo pipefail
 
