@@ -245,7 +245,9 @@ git fetch origin && git reset --hard origin/main
 
 ### `publish-dist: dist/index.html still references /src/main`
 
-Vite writes a transformed **`dist/index.html`** (with **`/assets/index-….js`**), then copies everything from **`public/`** into **`dist/`**. If **`public/index.html`** exists, it **overwrites** that file and you get the dev **`/src/main.tsx`** entry again.
+**First:** Run `grep 'type="module"' dist/index.html`. If you see **`src="/assets/…"`** in the head and **no** `<script type="module" src="/src/main…">`, the build is fine — update **`scripts/publish-dist.mjs`** from **`main`** (older versions treated any `/src/main` substring as an error, including text inside the boot inline script).
+
+**Real cause when a dev tag *is* there:** Vite writes a transformed **`dist/index.html`**, then copies **`public/`** into **`dist/`**. If **`public/index.html`** exists, it **overwrites** that file and you get **`<script type="module" src="/src/main.tsx">`** again.
 
 **Fix (on the server, from `public_html`):**
 

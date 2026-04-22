@@ -32,8 +32,17 @@ if (!fs.existsSync(distIndex)) {
 }
 
 const distHtml = fs.readFileSync(distIndex, 'utf8')
-if (distHtml.includes('/src/main')) {
-  console.error('publish-dist: dist/index.html still references /src/main — aborting.')
+/** True if a real Vite *dev* module entry is present (not string literals in our inline boot script). */
+function distHasDevModuleEntry(html) {
+  return (
+    /<script[^>]*\btype=["']module["'][^>]*\bsrc=["']\/src\/main/.test(html) ||
+    /<script[^>]*\bsrc=["']\/src\/main[^>]*\btype=["']module/.test(html)
+  )
+}
+if (distHasDevModuleEntry(distHtml)) {
+  console.error(
+    'publish-dist: dist/index.html still has a dev module script (src=/src/main…). Build misconfigured or public/index.html overwrote dist — aborting.',
+  )
   process.exit(1)
 }
 if (!distHtml.includes('/assets/')) {
