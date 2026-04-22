@@ -243,6 +243,21 @@ git fetch origin && git reset --hard origin/main
 
 (or `git pull origin main` if you prefer a merge). Confirm with `ls cloudways-deploy.sh`, then run the hook again.
 
+### `publish-dist: dist/index.html still references /src/main`
+
+Vite writes a transformed **`dist/index.html`** (with **`/assets/index-….js`**), then copies everything from **`public/`** into **`dist/`**. If **`public/index.html`** exists, it **overwrites** that file and you get the dev **`/src/main.tsx`** entry again.
+
+**Fix (on the server, from `public_html`):**
+
+```bash
+ls -la public/index.html
+rm -f public/index.html
+npm run build
+grep 'script.*src=' dist/index.html | head -1
+```
+
+You should see **`/assets/`** in **`dist/index.html`**. Then run **`export SHIPORKICK_CLOUDWAYS_DEPLOY=1 && bash ./cloudways-post-pull.sh`** (or **`npm run publish:dist`** if you already built).
+
 **If you already ran `npm run build` and only need to fix the live site right now** (no `git pull` yet), copy `dist/` into the web root manually:
 
 ```bash

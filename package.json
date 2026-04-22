@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "node ./scripts/check-no-public-index-html.mjs && tsc -b && vite build",
     "postbuild": "node ./scripts/sync-runtime-alias.mjs",
     "deploy:cloudways": "bash ./cloudways-deploy.sh",
     "publish:dist": "node ./scripts/publish-dist.mjs",
