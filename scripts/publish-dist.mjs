@@ -1,6 +1,7 @@
 /**
  * Copy Vite dist/ into the Apache web root (same directory as package.json by default).
  * Requires SHIPORKICK_CLOUDWAYS_DEPLOY=1 so local dev does not overwrite index.html by mistake.
+ * On Cloudways, this is invoked from npm postbuild (via publish-dist-if-enabled.mjs) after vite build.
  *
  * Order matters: refresh `assets/` *before* replacing `index.html`, otherwise visitors briefly
  * get new HTML pointing at new hashed bundles that are not on disk yet (white page).
@@ -92,6 +93,22 @@ function copyIndexToWebRoot() {
 
 copyIndexToWebRoot()
 
+/** Best-effort only: Cloudways `master_*` often cannot overwrite app-owned config in public_html. */
+function tryCopyOptionalRootFile(name) {
+  const src = path.join(distDir, name)
+  if (!fs.existsSync(src)) return
+  const dest = path.join(publishRoot, name)
+  try {
+    fs.copyFileSync(src, dest)
+  } catch (err) {
+    const code = err && typeof err === 'object' && 'code' in err ? err.code : ''
+    console.warn(
+      `publish-dist: could not copy ${name} (${String(code)}). ` +
+        'Core bundle is already published. Fix: SSH as application user, chmod/chown, or upload this file manually.',
+    )
+  }
+}
+
 for (const name of [
   'runtime-config.json',
   'shiporkick-runtime.json',
@@ -99,10 +116,7 @@ for (const name of [
   'favicon.svg',
   'icons.svg',
 ]) {
-  const src = path.join(distDir, name)
-  if (fs.existsSync(src)) {
-    fs.copyFileSync(src, path.join(publishRoot, name))
-  }
+  tryCopyOptionalRootFile(name)
 }
 
 const distHtaccess = path.join(distDir, '.htaccess')
