@@ -12,6 +12,14 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_ROOT"
 
+# Cloudways sometimes leaves a dirty tree (e.g. touched scripts), which makes `git pull` fail.
+# Untracked files (e.g. runtime-config.json) are kept; only tracked files match GitHub.
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git fetch origin
+  BRANCH="${SHIPORKICK_GIT_BRANCH:-main}"
+  git reset --hard "origin/${BRANCH}"
+fi
+
 export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 if [[ -s "$NVM_DIR/nvm.sh" ]]; then
   # shellcheck source=/dev/null
