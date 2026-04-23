@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { publicDb } from '../lib/publicSupabase'
 import { getSupabase } from '../lib/supabaseClient'
 
 interface BountyProps {
@@ -41,11 +42,12 @@ export function Bounty({ sessionId }: BountyProps) {
   const viewerId = useMemo(() => getStableViewerId(), [])
 
   useEffect(() => {
-    const client = getSupabase()
-    if (!client) return
+    const db = publicDb()
+    const root = getSupabase()
+    if (!db || !root) return
 
     const load = async () => {
-      const { data, error } = await client
+      const { data, error } = await db
         .from('sessions')
         .select('bounty_pool, start_time, current_health')
         .eq('id', sessionId)
@@ -63,7 +65,7 @@ export function Bounty({ sessionId }: BountyProps) {
 
     void load()
 
-    const channel = client
+    const channel = root
       .channel(`bounty-session:${sessionId}`)
       .on(
         'postgres_changes',
@@ -80,12 +82,12 @@ export function Bounty({ sessionId }: BountyProps) {
       .subscribe()
 
     return () => {
-      void client.removeChannel(channel)
+      void root.removeChannel(channel)
     }
   }, [sessionId])
 
   const onTip = async () => {
-    const client = getSupabase()
+    const client = publicDb()
     if (!client) {
       setMessage('Supabase is not configured.')
       return

@@ -12,6 +12,8 @@ dist
 dist-ssr
 .deploy-zip-staging
 shiporkick-webroot.zip
+# Stale extracted build (use fresh `npm run pack:cloudways` zip, not this folder)
+shiporkick-webroot/
 
 # Accidental web-root publish from cloudways-deploy.sh (repo root only)
 /assets/
@@ -21,6 +23,8 @@ shiporkick-webroot.zip
 .env
 .env.*
 !.env.example
+runtime-config.json
+shiporkick-runtime.json
 
 # Editor directories and files
 .vscode/*

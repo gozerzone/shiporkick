@@ -5,6 +5,10 @@ interface StreamerHUDProps {
   currentHealth: number
   xp: number
   xpToNextLevel: number
+  kickBucks: number
+  playerName: string
+  shieldActive?: boolean
+  glitchActive?: boolean
 }
 
 function clampPercent(value: number) {
@@ -16,6 +20,10 @@ export function StreamerHUD({
   currentHealth,
   xp,
   xpToNextLevel,
+  kickBucks,
+  playerName,
+  shieldActive = false,
+  glitchActive = false,
 }: StreamerHUDProps) {
   const [isMinimized, setIsMinimized] = useState(true)
   const sheetId = useId()
@@ -36,18 +44,30 @@ export function StreamerHUD({
       >
         <div className="streamer-hud__header">
           <p className="streamer-hud__kicker">TASK OF THE HOUR</p>
+          <p className="streamer-hud__kicker">{playerName.toUpperCase() || 'STREAMER'}</p>
         </div>
 
         <h2 className="streamer-hud__task">{taskOfHour}</h2>
 
-        <section className="streamer-hud__meter">
+        <section
+          className={`streamer-hud__meter${glitchActive ? ' streamer-hud__meter--glitch' : ''}${
+            shieldActive ? ' streamer-hud__meter--shield' : ''
+          }`}
+        >
           <div className="streamer-hud__meter-head">
             <span>FOCUS METER</span>
-            <span>{focusPercent}%</span>
+            <span>
+              {focusPercent}%
+              {shieldActive ? ' · SHIELD' : ''}
+            </span>
           </div>
           <div className="streamer-hud__track">
             <div className="streamer-hud__fill" style={{ width: `${focusPercent}%` }} />
           </div>
+          {shieldActive ? (
+            <p className="streamer-hud__shield-note">DEEP WORK: incoming kicks blocked (shield).</p>
+          ) : null}
+          {glitchActive ? <p className="streamer-hud__glitch-note">PRIORITY GLITCH: teammate spent a kick token.</p> : null}
         </section>
 
         <section className="streamer-hud__xp">
@@ -59,6 +79,12 @@ export function StreamerHUD({
           </div>
           <div className="streamer-hud__track">
             <div className="streamer-hud__fill streamer-hud__fill--dark" style={{ width: `${xpPercent}%` }} />
+          </div>
+        </section>
+        <section className="streamer-hud__xp">
+          <div className="streamer-hud__meter-head">
+            <span>KICK BUCKS</span>
+            <span>{kickBucks}</span>
           </div>
         </section>
       </div>

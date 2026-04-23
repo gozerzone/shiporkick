@@ -198,6 +198,8 @@ bash ./cloudways-post-pull.sh
 
 (Use this when Cloudways runs the hook with **current directory = `public_html`** after the pull — the usual default.)
 
+**What the scripts do:** `cloudways-post-pull.sh` exports `SHIPORKICK_CLOUDWAYS_DEPLOY=1` and runs `cloudways-deploy.sh`. After `vite build`, **`npm`’s `postbuild` step** runs `publish-dist` when that variable is set, so **`dist/` is copied into the web root in the same `npm run build` invocation** (you do not need a separate `npm run publish:dist` in the hook if you already use `cloudways-deploy.sh` or any flow that exports `SHIPORKICK_CLOUDWAYS_DEPLOY=1` **before** `npm run build`).
+
 **If the panel does not use `public_html` as cwd**, call the script by absolute path (copy from **Access Details → SSH** / your app’s `public_html` path):
 
 ```bash
@@ -275,7 +277,9 @@ cd /home/master/applications/qereqenxmn/public_html
 export SHIPORKICK_CLOUDWAYS_DEPLOY=1
 npm install
 npm run build
-npm run publish:dist
+# postbuild copies dist/ → this directory when SHIPORKICK_CLOUDWAYS_DEPLOY=1
+# Optional — only if you built earlier without the env:
+# export SHIPORKICK_CLOUDWAYS_DEPLOY=1 && npm run publish:dist
 ```
 
 ### `EPERM` when copying **`index.html`** or refreshing **`assets/`**

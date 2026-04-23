@@ -1,8 +1,9 @@
+import { ClerkProvider } from '@clerk/clerk-react'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
-import { loadRuntimeConfig } from './lib/runtimeEnv'
+import { loadRuntimeConfig, getPublicEnv } from './lib/runtimeEnv'
 import { StreamingProvider } from './providers/StreamingProvider'
 
 const root = document.getElementById('root')
@@ -16,11 +17,15 @@ void Promise.race([
   }),
 ]).then(() => {
     if (!root) return
-    createRoot(root).render(
+    const clerkKey = getPublicEnv('VITE_CLERK_PUBLISHABLE_KEY')
+    const tree = (
       <StrictMode>
         <StreamingProvider>
           <App />
         </StreamingProvider>
-      </StrictMode>,
+      </StrictMode>
+    )
+    createRoot(root).render(
+      clerkKey ? <ClerkProvider publishableKey={clerkKey}>{tree}</ClerkProvider> : tree,
     )
   })

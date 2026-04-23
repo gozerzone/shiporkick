@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { getSupabase } from '../lib/supabaseClient'
+import { publicDb } from '../lib/publicSupabase'
 
 interface SubmitFoulResult {
   applied: boolean
@@ -30,7 +30,7 @@ export function FoulButton({ sessionId }: FoulButtonProps) {
   const viewerId = useMemo(() => getStableViewerId(), [])
 
   const submitFoul = async () => {
-    const supabase = getSupabase()
+    const supabase = publicDb()
     if (!supabase) {
       setMessage('Supabase is not configured.')
       return
@@ -61,7 +61,7 @@ export function FoulButton({ sessionId }: FoulButtonProps) {
       setMessage(`Impact landed. Stream health is now ${result.current_health}.`)
     } else {
       setMessage(
-        `Foul registered. ${result.needed_fouls} more unique fouls needed in this 2-minute window.`,
+        `Kick vote recorded. ${result.needed_fouls} more unique voters needed.`,
       )
     }
 
@@ -78,7 +78,7 @@ export function FoulButton({ sessionId }: FoulButtonProps) {
       >
         {isSubmitting ? 'REPORTING FOUL...' : 'FOUL'}
       </button>
-      <p>5 unique fouls in 2 minutes are required to reduce health by 20.</p>
+      <p>Kick rules: 3 unique voters trigger a hit. Each viewer gets 1 kick vote per hour.</p>
       {message ? <p>{message}</p> : null}
     </div>
   )

@@ -4,7 +4,8 @@
 #
 # Pull replaces index.html with the Vite *source* file (script src=/src/main.tsx). This script
 # rebuilds and copies dist/ back into the web root so the live site loads hashed /assets/* bundles.
-# publish-dist.mjs copies assets/ before index.html to avoid a brief window where new HTML 404s JS.
+# publish-dist (via npm postbuild when SHIPORKICK_CLOUDWAYS_DEPLOY=1) copies assets/ before index.html
+# to avoid a brief window where new HTML 404s JS.
 
 set -euo pipefail
 
@@ -73,13 +74,21 @@ if ! grep -q '/assets/' dist/index.html; then
   exit 1
 fi
 
-# Without this, a developer who runs this script locally would replace the Vite dev index.html.
+# Without SHIPORKICK_CLOUDWAYS_DEPLOY=1, postbuild skips publish-dist (see package.json postbuild).
 if [[ "${SHIPORKICK_CLOUDWAYS_DEPLOY:-}" != "1" ]]; then
   echo "cloudways-deploy.sh: build OK. Skipping in-place publish (set SHIPORKICK_CLOUDWAYS_DEPLOY=1 on the server hook)." >&2
   exit 0
 fi
 
+# publish-dist already ran via npm postbuild when the env var was set before npm run build.
 if [[ -n "${SHIPORKICK_WEBROOT:-}" ]]; then
-  export SHIPORKICK_WEBROOT
+  WEBROOT="$(cd "$SHIPORKICK_WEBROOT" && pwd)"
+else
+  WEBROOT="$ROOT"
 fi
-node "$ROOT/scripts/publish-dist.mjs"
+if ! grep -q '/assets/' "$WEBROOT/index.html" 2>/dev/null; then
+  echo "cloudways-deploy.sh: $WEBROOT/index.html does not reference /assets/ — publish-dist did not update the web root." >&2
+  echo "cloudways-deploy.sh: Ensure SHIPORKICK_CLOUDWAYS_DEPLOY=1 is exported before npm run build (see cloudways-post-pull.sh)." >&2
+  exit 1
+fi
+echo "cloudways-deploy.sh: OK — web root index references /assets/ ($WEBROOT)."
