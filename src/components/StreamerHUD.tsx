@@ -15,6 +15,12 @@ function clampPercent(value: number) {
   return Math.min(100, Math.max(0, value))
 }
 
+function hpColor(hp: number): string {
+  if (hp > 60) return 'var(--green)'
+  if (hp > 30) return 'var(--gold)'
+  return 'var(--danger)'
+}
+
 export function StreamerHUD({
   taskOfHour,
   currentHealth,
@@ -28,94 +34,101 @@ export function StreamerHUD({
   const [isMinimized, setIsMinimized] = useState(true)
   const sheetId = useId()
   const focusPercent = clampPercent(currentHealth)
-  const xpPercent = clampPercent((xpToNextLevel > 0 ? (xp / xpToNextLevel) * 100 : 0))
+  const xpPercent = clampPercent(xpToNextLevel > 0 ? (xp / xpToNextLevel) * 100 : 0)
 
   return (
-    <aside
-      className={`streamer-hud ${isMinimized ? 'streamer-hud--minimized' : ''}`}
-      aria-live="polite"
-    >
-      <div
-        id={sheetId}
-        className="streamer-hud__sheet"
-        role="region"
-        aria-label="Streamer status"
-        aria-hidden={isMinimized}
-      >
-        <div className="streamer-hud__header">
-          <p className="streamer-hud__kicker">TASK OF THE HOUR</p>
-          <p className="streamer-hud__kicker">{playerName.toUpperCase() || 'STREAMER'}</p>
+    <aside className="streamer-hud" aria-live="polite">
+      {!isMinimized && (
+        <div id={sheetId} className="streamer-hud__sheet" role="region" aria-label="Streamer status" aria-hidden={isMinimized}>
+          {/* Task row */}
+          <div className="streamer-hud__row">
+            <div className="live-pulse">
+              <div className="live-pulse__dot" />
+              <span className="live-pulse__label">LIVE</span>
+            </div>
+            <span className="streamer-hud__task">{taskOfHour || 'No task set'}</span>
+          </div>
+
+          {/* HP meter */}
+          <div className={`streamer-hud__row${glitchActive ? ' streamer-hud__meter--glitch' : ''}`}>
+            <span className="streamer-hud__stat">HP</span>
+            <div className="streamer-hud__meter-wrap">
+              <div className="streamer-hud__meter-track">
+                <div
+                  className="streamer-hud__meter-fill"
+                  style={{ width: `${focusPercent}%`, background: hpColor(currentHealth) }}
+                />
+              </div>
+              <span className="streamer-hud__stat" style={{ color: hpColor(currentHealth), minWidth: '32px', textAlign: 'right' }}>
+                {focusPercent}%
+              </span>
+            </div>
+            {shieldActive && (
+              <span className="streamer-hud__shield-note">🛡 SHIELD</span>
+            )}
+          </div>
+
+          {/* XP + Kick Bucks */}
+          <div className="streamer-hud__row">
+            <span className="streamer-hud__stat">XP</span>
+            <div className="xp-bar" style={{ flex: 1 }}>
+              <div className="xp-bar__track">
+                <div className="xp-bar__fill" style={{ width: `${xpPercent}%` }} />
+              </div>
+              <span className="xp-bar__label">{xp}/{xpToNextLevel}</span>
+            </div>
+            <div className="streamer-hud__divider" />
+            <span className="streamer-hud__stat streamer-hud__stat--gold">⚡ {kickBucks} KB</span>
+          </div>
+
+          {glitchActive && (
+            <div className="streamer-hud__row">
+              <span className="streamer-hud__stat" style={{ color: 'var(--danger)', fontSize: '10px' }}>
+                ⚠ PRIORITY GLITCH — teammate spent a kick token
+              </span>
+            </div>
+          )}
+          {shieldActive && (
+            <div className="streamer-hud__row">
+              <span className="streamer-hud__stat" style={{ color: 'var(--gold)', fontSize: '10px' }}>
+                🛡 DEEP WORK — incoming kicks blocked
+              </span>
+            </div>
+          )}
         </div>
+      )}
 
-        <h2 className="streamer-hud__task">{taskOfHour}</h2>
-
-        <section
-          className={`streamer-hud__meter${glitchActive ? ' streamer-hud__meter--glitch' : ''}${
-            shieldActive ? ' streamer-hud__meter--shield' : ''
-          }`}
+      {/* Tab strip — always visible */}
+      <div className="streamer-hud__tab" role="toolbar">
+        <button
+          type="button"
+          className="streamer-hud__tab-toggle"
+          aria-expanded={!isMinimized}
+          aria-controls={sheetId}
+          onClick={() => setIsMinimized((prev) => !prev)}
         >
-          <div className="streamer-hud__meter-head">
-            <span>FOCUS METER</span>
-            <span>
-              {focusPercent}%
-              {shieldActive ? ' · SHIELD' : ''}
-            </span>
-          </div>
-          <div className="streamer-hud__track">
-            <div className="streamer-hud__fill" style={{ width: `${focusPercent}%` }} />
-          </div>
-          {shieldActive ? (
-            <p className="streamer-hud__shield-note">DEEP WORK: incoming kicks blocked (shield).</p>
-          ) : null}
-          {glitchActive ? <p className="streamer-hud__glitch-note">PRIORITY GLITCH: teammate spent a kick token.</p> : null}
-        </section>
+          <span
+            className="streamer-hud__tab-toggle-arrow"
+            style={{ transform: isMinimized ? 'rotate(0deg)' : 'rotate(180deg)' }}
+          >
+            ▲
+          </span>
+          {isMinimized
+            ? `HUD · HP ${focusPercent}% · XP ${xp}/${xpToNextLevel} · ${playerName.toUpperCase() || 'STREAMER'}`
+            : 'MINIMIZE HUD'}
+        </button>
 
-        <section className="streamer-hud__xp">
-          <div className="streamer-hud__meter-head">
-            <span>XP</span>
-            <span>
-              {xp}/{xpToNextLevel}
-            </span>
-          </div>
-          <div className="streamer-hud__track">
-            <div className="streamer-hud__fill streamer-hud__fill--dark" style={{ width: `${xpPercent}%` }} />
-          </div>
-        </section>
-        <section className="streamer-hud__xp">
-          <div className="streamer-hud__meter-head">
-            <span>KICK BUCKS</span>
-            <span>{kickBucks}</span>
-          </div>
-        </section>
-      </div>
-
-      <button
-        type="button"
-        className="streamer-hud__tab"
-        aria-expanded={!isMinimized}
-        aria-controls={sheetId}
-        onClick={() => setIsMinimized((prev) => !prev)}
-      >
-        {isMinimized ? (
+        {!isMinimized && (
           <>
-            <span className="streamer-hud__tab-cue" aria-hidden>
-              ▲
+            <div className="streamer-hud__divider" />
+            <span className="streamer-hud__stat streamer-hud__stat--pink" style={{ fontSize: '10px' }}>
+              {playerName.toUpperCase() || 'STREAMER'}
             </span>
-            <span className="streamer-hud__tab-label">
-              HUD · HP {focusPercent}% · XP {xp}/{xpToNextLevel}
-            </span>
-            <span className="streamer-hud__tab-action">OPEN</span>
-          </>
-        ) : (
-          <>
-            <span className="streamer-hud__tab-cue" aria-hidden>
-              ▼
-            </span>
-            <span className="streamer-hud__tab-label">TASK HUD</span>
-            <span className="streamer-hud__tab-action">MINIMIZE</span>
           </>
         )}
-      </button>
+
+        <span className="streamer-hud__brand">SHIP OR KICK</span>
+      </div>
     </aside>
   )
 }
