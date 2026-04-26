@@ -3,6 +3,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import { DisclaimerGate } from './components/DisclaimerGate'
 import { loadRuntimeConfig, getPublicEnv } from './lib/runtimeEnv'
 import { StreamingProvider } from './providers/StreamingProvider'
 
@@ -20,9 +21,11 @@ void Promise.race([
     const clerkKey = getPublicEnv('VITE_CLERK_PUBLISHABLE_KEY')
     const tree = (
       <StrictMode>
-        <StreamingProvider>
-          <App />
-        </StreamingProvider>
+        <DisclaimerGate>
+          <StreamingProvider>
+            <App />
+          </StreamingProvider>
+        </DisclaimerGate>
       </StrictMode>
     )
     createRoot(root).render(

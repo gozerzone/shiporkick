@@ -529,8 +529,8 @@ function App() {
                   onChange={(e) => setAccountIdDraft(e.target.value)}
                   placeholder="your-name"
                 />
-                <button type="button" className="btn" onClick={() => setAccountId(accountIdDraft)}>
-                  Load Account
+                <button type="button" className="btn btn--primary" onClick={() => setAccountId(accountIdDraft)}>
+                  LOAD ACCOUNT
                 </button>
               </>
             ) : (

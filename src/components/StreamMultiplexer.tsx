@@ -1,10 +1,5 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useStreaming } from '../providers/StreamingProvider'
-
-interface Point {
-  x: number
-  y: number
-}
 
 interface StreamMultiplexerProps {
   userId: string
@@ -15,6 +10,8 @@ interface StreamMultiplexerProps {
 }
 
 const CAMERA_SIZE = 170
+const CAM_X_PERCENT = 82
+const CAM_Y_PERCENT = 74
 const IDLE_TIMEOUT_MS = 10 * 60 * 1000
 const IDLE_SAMPLE_MS = 5000
 const IDLE_SAMPLE_WIDTH = 32
@@ -25,28 +22,16 @@ function waitVideoReady(video: HTMLVideoElement, label: string, timeoutMs = 2500
   return new Promise((resolve, reject) => {
     let timer: ReturnType<typeof window.setTimeout> | undefined
     const cleanup = () => {
-      if (timer !== undefined) {
-        window.clearTimeout(timer)
-        timer = undefined
-      }
+      if (timer !== undefined) { window.clearTimeout(timer); timer = undefined }
       video.removeEventListener('loadedmetadata', onMeta)
       video.removeEventListener('resize', onResize)
     }
-    const finish = () => {
-      if (video.videoWidth > 0 && video.videoHeight > 0) {
-        cleanup()
-        resolve()
-      }
-    }
+    const finish = () => { if (video.videoWidth > 0 && video.videoHeight > 0) { cleanup(); resolve() } }
     const onMeta = () => finish()
     const onResize = () => finish()
     timer = window.setTimeout(() => {
       cleanup()
-      reject(
-        new Error(
-          `${label}: no video dimensions yet. Pick a real screen/window in the share dialog, or try another browser.`,
-        ),
-      )
+      reject(new Error(`${label}: no video dimensions yet. Pick a real screen/window in the share dialog.`))
     }, timeoutMs)
     video.addEventListener('loadedmetadata', onMeta)
     video.addEventListener('resize', onResize)
@@ -56,9 +41,7 @@ function waitVideoReady(video: HTMLVideoElement, label: string, timeoutMs = 2500
 
 function stopStream(stream: MediaStream | null) {
   if (!stream) return
-  for (const track of stream.getTracks()) {
-    track.stop()
-  }
+  for (const track of stream.getTracks()) track.stop()
 }
 
 export function StreamMultiplexer({
@@ -68,39 +51,19 @@ export function StreamMultiplexer({
   onLiveChange,
   onIdleKick,
 }: StreamMultiplexerProps) {
-  const {
-    connectAsHost,
-    disconnect,
-    isConnected,
-    publishMultiplexedTracks,
-    roomName,
-    shareLink,
-    unpublishMultiplexedTracks,
-  } = useStreaming()
+  const { connectAsHost, disconnect, isConnected, publishMultiplexedTracks, roomName, shareLink, unpublishMultiplexedTracks } = useStreaming()
   const [isStarting, setIsStarting] = useState(false)
   const [isLive, setIsLive] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [pipHint, setPipHint] = useState<string | null>(null)
-  const [hasCamera, setHasCamera] = useState(true)
-  const [position, setPosition] = useState<Point>({ x: 32, y: 36 })
-  const [isDragging, setIsDragging] = useState(false)
 
-  const positionRef = useRef(position)
   const previewRef = useRef<HTMLVideoElement>(null)
-  const pipRef = useRef<HTMLVideoElement>(null)
-  const stageRef = useRef<HTMLDivElement>(null)
   const renderStopRef = useRef(false)
-  const dragOffsetRef = useRef<Point>({ x: 0, y: 0 })
   const idleIntervalRef = useRef<number | null>(null)
   const lastActiveAtRef = useRef(0)
   const previousSampleRef = useRef<Uint8ClampedArray | null>(null)
-
   const screenStreamRef = useRef<MediaStream | null>(null)
   const cameraStreamRef = useRef<MediaStream | null>(null)
   const mixedStreamRef = useRef<MediaStream | null>(null)
-  useEffect(() => {
-    positionRef.current = position
-  }, [position])
 
   const stopBroadcast = useCallback(async () => {
     renderStopRef.current = true
@@ -108,24 +71,12 @@ export function StreamMultiplexer({
     stopStream(screenStreamRef.current)
     stopStream(cameraStreamRef.current)
     stopStream(mixedStreamRef.current)
-
     screenStreamRef.current = null
     cameraStreamRef.current = null
     mixedStreamRef.current = null
-
-    if (previewRef.current) {
-      previewRef.current.srcObject = null
-    }
-    if (pipRef.current) {
-      pipRef.current.srcObject = null
-    }
-
-    if (document.pictureInPictureElement) {
-      void document.exitPictureInPicture()
-    }
-
+    if (previewRef.current) previewRef.current.srcObject = null
+    if (document.pictureInPictureElement) void document.exitPictureInPicture()
     setIsLive(false)
-    setHasCamera(false)
     onLiveChange?.(false, false)
     setIsStarting(false)
     if (idleIntervalRef.current !== null) {
@@ -137,44 +88,36 @@ export function StreamMultiplexer({
   }, [disconnect, onLiveChange, unpublishMultiplexedTracks])
 
   useEffect(() => {
-    return () => {
-      void stopBroadcast()
-    }
+    return () => { void stopBroadcast() }
   }, [stopBroadcast])
 
   useEffect(() => {
     if (kickSignal <= 0) return
     if (!isLive && !isStarting) return
-    const handle = window.setTimeout(() => {
-      void stopBroadcast()
-    }, 0)
+    const handle = window.setTimeout(() => { void stopBroadcast() }, 0)
     return () => window.clearTimeout(handle)
   }, [kickSignal, isLive, isStarting, stopBroadcast])
 
   const startBroadcast = async () => {
     if (disabled || isStarting || isLive) return
-
     setError(null)
     setIsStarting(true)
     renderStopRef.current = false
 
     try {
       if (!window.isSecureContext) {
-        throw new Error('Screen and camera require HTTPS (or localhost). Open the site over SSL.')
+        throw new Error('Screen and camera require HTTPS (or localhost).')
       }
       if (!navigator.mediaDevices?.getDisplayMedia) {
-        throw new Error('This browser does not expose screen capture APIs.')
+        throw new Error('This browser does not support screen capture.')
       }
 
-      const screenStream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: false,
-      })
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
       const screenVideoTrack = screenStream.getVideoTracks()[0]
       if (screenVideoTrack) {
         screenVideoTrack.addEventListener('ended', () => {
           if (renderStopRef.current) return
-          setError('Screen share stopped (track ended).')
+          setError('Screen share stopped.')
           void stopBroadcast()
         })
       }
@@ -186,12 +129,9 @@ export function StreamMultiplexer({
             video: { width: { ideal: 1280 }, height: { ideal: 720 } },
             audio: true,
           })
-        } catch {
-          cameraStream = null
-        }
+        } catch { cameraStream = null }
       }
       const cameraAvailable = Boolean(cameraStream?.getVideoTracks().length)
-      setHasCamera(cameraAvailable)
 
       screenStreamRef.current = screenStream
       cameraStreamRef.current = cameraStream
@@ -199,25 +139,15 @@ export function StreamMultiplexer({
       const screenVideo = document.createElement('video')
       const cameraVideo = cameraStream ? document.createElement('video') : null
       screenVideo.srcObject = screenStream
-      if (cameraVideo && cameraStream) {
-        cameraVideo.srcObject = cameraStream
-      }
+      if (cameraVideo && cameraStream) cameraVideo.srcObject = cameraStream
       screenVideo.muted = true
-      if (cameraVideo) {
-        cameraVideo.muted = true
-      }
+      if (cameraVideo) cameraVideo.muted = true
       screenVideo.playsInline = true
-      if (cameraVideo) {
-        cameraVideo.playsInline = true
-      }
+      if (cameraVideo) cameraVideo.playsInline = true
       await screenVideo.play()
-      if (cameraVideo) {
-        await cameraVideo.play()
-      }
+      if (cameraVideo) await cameraVideo.play()
       await waitVideoReady(screenVideo, 'Screen capture')
-      if (cameraVideo) {
-        await waitVideoReady(cameraVideo, 'Camera')
-      }
+      if (cameraVideo) await waitVideoReady(cameraVideo, 'Camera')
       lastActiveAtRef.current = Date.now()
       previousSampleRef.current = null
 
@@ -227,53 +157,42 @@ export function StreamMultiplexer({
       canvas.width = width
       canvas.height = height
       const ctx = canvas.getContext('2d')
-      if (!ctx) {
-        throw new Error('2D canvas context unavailable.')
-      }
+      if (!ctx) throw new Error('2D canvas context unavailable.')
 
       const renderFrame = () => {
         if (renderStopRef.current) return
         ctx.clearRect(0, 0, width, height)
         ctx.drawImage(screenVideo, 0, 0, width, height)
 
-        const px = (positionRef.current.x / 100) * width
-        const py = (positionRef.current.y / 100) * height
-        const radius = (CAMERA_SIZE / 2 / 1280) * width
-        const clampedX = Math.min(Math.max(radius, px), width - radius)
-        const clampedY = Math.min(Math.max(radius, py), height - radius)
-
         if (cameraVideo) {
+          const px = (CAM_X_PERCENT / 100) * width
+          const py = (CAM_Y_PERCENT / 100) * height
+          const radius = (CAMERA_SIZE / 2 / 1280) * width
+          const cx = Math.min(Math.max(radius, px), width - radius)
+          const cy = Math.min(Math.max(radius, py), height - radius)
           ctx.save()
           ctx.beginPath()
-          ctx.arc(clampedX, clampedY, radius, 0, Math.PI * 2)
+          ctx.arc(cx, cy, radius, 0, Math.PI * 2)
           ctx.clip()
-          ctx.drawImage(
-            cameraVideo,
-            clampedX - radius,
-            clampedY - radius,
-            radius * 2,
-            radius * 2,
-          )
+          ctx.drawImage(cameraVideo, cx - radius, cy - radius, radius * 2, radius * 2)
           ctx.restore()
-
           ctx.lineWidth = 8
-          ctx.strokeStyle = '#000000'
+          ctx.strokeStyle = '#000'
           ctx.beginPath()
-          ctx.arc(clampedX, clampedY, radius, 0, Math.PI * 2)
+          ctx.arc(cx, cy, radius, 0, Math.PI * 2)
           ctx.stroke()
         }
 
         requestAnimationFrame(renderFrame)
       }
-
       renderFrame()
+
       const sampleCanvas = document.createElement('canvas')
       sampleCanvas.width = IDLE_SAMPLE_WIDTH
       sampleCanvas.height = IDLE_SAMPLE_HEIGHT
       const sampleCtx = sampleCanvas.getContext('2d', { willReadFrequently: true })
-      if (!sampleCtx) {
-        throw new Error('Idle detector canvas context unavailable.')
-      }
+      if (!sampleCtx) throw new Error('Idle detector canvas unavailable.')
+
       const markScreenActivity = () => {
         sampleCtx.drawImage(screenVideo, 0, 0, IDLE_SAMPLE_WIDTH, IDLE_SAMPLE_HEIGHT)
         const pixels = sampleCtx.getImageData(0, 0, IDLE_SAMPLE_WIDTH, IDLE_SAMPLE_HEIGHT).data
@@ -289,8 +208,7 @@ export function StreamMultiplexer({
           totalDiff += Math.abs(pixels[i + 1] - previous[i + 1])
           totalDiff += Math.abs(pixels[i + 2] - previous[i + 2])
         }
-        const avgDiff = totalDiff / (IDLE_SAMPLE_WIDTH * IDLE_SAMPLE_HEIGHT * 3)
-        if (avgDiff >= IDLE_DIFF_THRESHOLD) {
+        if (totalDiff / (IDLE_SAMPLE_WIDTH * IDLE_SAMPLE_HEIGHT * 3) >= IDLE_DIFF_THRESHOLD) {
           lastActiveAtRef.current = Date.now()
         }
         previousSampleRef.current = new Uint8ClampedArray(pixels)
@@ -300,55 +218,26 @@ export function StreamMultiplexer({
         if (renderStopRef.current) return
         markScreenActivity()
         if (Date.now() - lastActiveAtRef.current < IDLE_TIMEOUT_MS) return
-        setError('Auto-kick: screen was idle for 10 minutes.')
+        setError('Auto-kick: screen idle for 10 minutes.')
         onIdleKick?.()
         void stopBroadcast()
       }, IDLE_SAMPLE_MS)
 
       const composedStream = canvas.captureStream(30)
       mixedStreamRef.current = composedStream
-      if (previewRef.current) {
-        previewRef.current.srcObject = composedStream
-      }
-      if (pipRef.current && cameraStream) {
-        pipRef.current.srcObject = cameraStream
-        await pipRef.current.play()
-      }
+      if (previewRef.current) previewRef.current.srcObject = composedStream
 
       const composedVideoTrack = composedStream.getVideoTracks()[0]
       const cameraAudioTrack = cameraStream?.getAudioTracks()[0]
-      if (!composedVideoTrack) {
-        throw new Error('Composed stream did not produce a video track.')
-      }
+      if (!composedVideoTrack) throw new Error('Composed stream produced no video track.')
 
       await connectAsHost(userId)
       await publishMultiplexedTracks(composedVideoTrack, cameraAudioTrack)
 
-      if (
-        cameraStream &&
-        pipRef.current &&
-        'pictureInPictureEnabled' in document &&
-        document.pictureInPictureEnabled
-      ) {
-        try {
-          await pipRef.current.requestPictureInPicture()
-          setPipHint('Camera PiP engaged. You can keep eyes on stream while working in other apps.')
-        } catch {
-          setPipHint('PiP auto-launch was blocked. Use browser PiP controls to open manually.')
-        }
-      } else {
-        setPipHint(
-          cameraStream
-            ? 'Picture-in-Picture is not supported in this browser.'
-            : 'No camera detected. Streaming screen-only mode (1 kick credit per 3 hours).',
-        )
-      }
-
       setIsLive(true)
       onLiveChange?.(true, cameraAvailable)
     } catch (captureError) {
-      const message =
-        captureError instanceof Error ? captureError.message : 'Failed to start multiplexer.'
+      const message = captureError instanceof Error ? captureError.message : 'Failed to start multiplexer.'
       setError(message)
       await stopBroadcast()
     } finally {
@@ -356,82 +245,48 @@ export function StreamMultiplexer({
     }
   }
 
-  const onDragStart = (event: PointerEvent<HTMLButtonElement>) => {
-    const stage = stageRef.current
-    if (!stage) return
-    const rect = stage.getBoundingClientRect()
-    const xPx = (positionRef.current.x / 100) * rect.width
-    const yPx = (positionRef.current.y / 100) * rect.height
-    dragOffsetRef.current = {
-      x: event.clientX - xPx,
-      y: event.clientY - yPx,
-    }
-    setIsDragging(true)
-  }
-
-  const onDragMove = (event: PointerEvent<HTMLDivElement>) => {
-    if (!isDragging) return
-    const stage = stageRef.current
-    if (!stage) return
-    const rect = stage.getBoundingClientRect()
-    const xPx = event.clientX - rect.left - dragOffsetRef.current.x
-    const yPx = event.clientY - rect.top - dragOffsetRef.current.y
-
-    const x = Math.min(Math.max((xPx / rect.width) * 100, 7), 93)
-    const y = Math.min(Math.max((yPx / rect.height) * 100, 10), 90)
-    setPosition({ x, y })
-  }
-
-  const onDragEnd = () => {
-    setIsDragging(false)
-  }
-
   return (
     <div className="multiplexer">
-      <div className="actions">
-        <button
-          className="btn btn--primary"
-          type="button"
-          onClick={isLive ? () => void stopBroadcast() : () => void startBroadcast()}
-          disabled={isStarting || disabled}
-        >
-          {isStarting ? 'ARMING MULTIPLEXER...' : isLive ? 'STOP MULTIPLEXER' : 'START MULTIPLEXER'}
-        </button>
+      <div className="multiplexer__stage">
+        <video ref={previewRef} autoPlay muted playsInline className="multiplexer__preview" />
+        {!isLive && !isStarting && (
+          <div className="multiplexer__idle-cover">No stream active</div>
+        )}
       </div>
-      {disabled ? <p className="error">Streaming disabled during cooldown.</p> : null}
 
-      <div
-        className="multiplexer__stage"
-        ref={stageRef}
-        onPointerMove={onDragMove}
-        onPointerUp={onDragEnd}
-        onPointerLeave={onDragEnd}
-      >
-        <video ref={previewRef} autoPlay muted playsInline className="preview" />
-        {hasCamera ? (
+      <div className="multiplexer__controls">
+        {isLive ? (
           <button
             type="button"
-            className="camera-chip"
-            style={{ left: `${position.x}%`, top: `${position.y}%` }}
-            onPointerDown={onDragStart}
-            aria-label="Drag camera overlay"
-            title="Drag camera overlay"
+            className="btn btn-danger"
+            style={{ flex: 1, fontSize: '12px', padding: '10px' }}
+            onClick={() => void stopBroadcast()}
           >
-            CAM
+            ■ STOP STREAM
           </button>
-        ) : null}
+        ) : (
+          <button
+            type="button"
+            className="btn btn--primary"
+            style={{ flex: 1, fontSize: '12px', padding: '10px' }}
+            onClick={() => void startBroadcast()}
+            disabled={isStarting || disabled}
+          >
+            {isStarting ? 'ARMING...' : '▶ START STREAM'}
+          </button>
+        )}
       </div>
-      <video ref={pipRef} autoPlay muted playsInline className="pip-source" />
 
-      <p>
-        Screen + camera are composited locally first, then LiveKit connects and publishes one video track (plus mic if
-        available). You will show DISCONNECTED until the composite is ready, then CONNECTED while live.
-      </p>
-      {pipHint ? <p>{pipHint}</p> : null}
-      <p>Room: {roomName}</p>
-      <p>Status: {isConnected ? 'CONNECTED' : 'DISCONNECTED'}</p>
-      <p>Share Link (subscribe-only): {shareLink}</p>
-      {error ? <p className="error">Multiplexer error: {error}</p> : null}
+      {disabled && <p className="multiplexer__error">Streaming disabled during cooldown.</p>}
+      {error && <p className="multiplexer__error">{error}</p>}
+
+      <div className="multiplexer__meta">
+        <span style={{ color: isConnected ? 'var(--green)' : 'var(--muted)' }}>
+          {isConnected ? '● LIVE' : '○ OFFLINE'}
+        </span>
+        <span>Room: {roomName}</span>
+      </div>
+      <p className="multiplexer__share">Share: {shareLink}</p>
     </div>
   )
 }
