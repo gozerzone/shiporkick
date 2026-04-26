@@ -108,6 +108,15 @@ function App() {
     getPublicEnv('VITE_LIVEKIT_TOKEN') && !getPublicEnv('VITE_LIVEKIT_TOKEN_ENDPOINT'),
   )
   const liveKitRoomHintNeeded = liveKitStaticTokenNeedsRoomHint()
+  const handleLiveChange = useCallback((isLive: boolean, hasCamera: boolean) => {
+    setIsStreaming(isLive)
+    setStreamHasCamera(hasCamera)
+  }, [])
+
+  const handleIdleKick = useCallback(() => {
+    setCurrentHealth(0)
+  }, [])
+
   const refreshTokens = useCallback(async () => {
     if (!clerkUserId) {
       setTokenBalances(null)
@@ -597,11 +606,8 @@ function App() {
               userId={userId}
               disabled={isLobbyMode && displayCooldownMs > 0}
               kickSignal={kickSignal}
-              onLiveChange={(isLive, hasCamera) => {
-                setIsStreaming(isLive)
-                setStreamHasCamera(hasCamera)
-              }}
-              onIdleKick={() => setCurrentHealth(0)}
+              onLiveChange={handleLiveChange}
+              onIdleKick={handleIdleKick}
             />
           )}
         </article>
