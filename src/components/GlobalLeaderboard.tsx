@@ -10,6 +10,57 @@ import { WORK_CATEGORIES } from '../lib/workCategories'
 
 const XP_SEGMENT = 500
 
+function hpToKicks(hp: number): 0 | 1 | 2 | 3 {
+  if (hp <= 0) return 3
+  if (hp <= 60) return 2
+  if (hp <= 80) return 1
+  return 0
+}
+
+function RowHeadphones({ hp }: { hp: number }) {
+  const kicks = hpToKicks(hp)
+  const TEXT = 'var(--text)'
+  const MUTED = 'var(--muted)'
+  const DANGER = 'var(--danger)'
+
+  if (kicks === 0) return (
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-label="No damage">
+      <path d="M6 18v-4a10 10 0 0 1 20 0v4" stroke={TEXT} strokeWidth="2" strokeLinecap="round" fill="none"/>
+      <rect x="3" y="16" width="5" height="8" rx="2" fill={TEXT}/>
+      <rect x="24" y="16" width="5" height="8" rx="2" fill={TEXT}/>
+    </svg>
+  )
+  if (kicks === 1) return (
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-label="1 kick vote">
+      <path d="M6 18v-4a10 10 0 0 1 20 0v4" stroke={MUTED} strokeWidth="2" strokeLinecap="round" fill="none" strokeDasharray="3 2"/>
+      <rect x="3" y="16" width="5" height="8" rx="2" fill={MUTED} opacity="0.3"/>
+      <line x1="3" y1="16" x2="8" y2="24" stroke={DANGER} strokeWidth="1.5"/>
+      <line x1="8" y1="16" x2="3" y2="24" stroke={DANGER} strokeWidth="1.5"/>
+      <rect x="24" y="16" width="5" height="8" rx="2" fill={TEXT}/>
+    </svg>
+  )
+  if (kicks === 2) return (
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-label="2 kick votes">
+      <path d="M6 18v-4a10 10 0 0 1 20 0v4" stroke={DANGER} strokeWidth="2" strokeLinecap="round" fill="none" strokeDasharray="2 3"/>
+      <rect x="3" y="16" width="5" height="8" rx="2" fill={DANGER} opacity="0.3"/>
+      <line x1="3" y1="16" x2="8" y2="24" stroke={DANGER} strokeWidth="1.5"/>
+      <line x1="8" y1="16" x2="3" y2="24" stroke={DANGER} strokeWidth="1.5"/>
+      <rect x="24" y="16" width="5" height="8" rx="2" fill={DANGER} opacity="0.3"/>
+      <line x1="24" y1="16" x2="29" y2="24" stroke={DANGER} strokeWidth="1.5"/>
+      <line x1="29" y1="16" x2="24" y2="24" stroke={DANGER} strokeWidth="1.5"/>
+    </svg>
+  )
+  return (
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-label="Wasted">
+      <path d="M6 18v-4a10 10 0 0 1 20 0v4" stroke={DANGER} strokeWidth="2" strokeLinecap="round" fill="none" strokeDasharray="1 4" opacity="0.4"/>
+      <rect x="3" y="16" width="5" height="8" rx="2" fill={DANGER} opacity="0.2"/>
+      <rect x="24" y="16" width="5" height="8" rx="2" fill={DANGER} opacity="0.2"/>
+      <line x1="12" y1="8" x2="15" y2="12" stroke={DANGER} strokeWidth="1.5" opacity="0.6"/>
+      <line x1="17" y1="6" x2="20" y2="10" stroke={DANGER} strokeWidth="1.5" opacity="0.6"/>
+    </svg>
+  )
+}
+
 interface GlobalLeaderboardProps {
   clerkUserId: string | null
   myProfileId: string | null
@@ -224,6 +275,10 @@ export function GlobalLeaderboard({ clerkUserId, myProfileId, onTokenEconomyChan
                     {xpMod}/{XP_SEGMENT} XP
                   </span>
                 </div>
+              </div>
+
+              <div style={{ flexShrink: 0 }}>
+                <RowHeadphones hp={row.currentHealth} />
               </div>
 
               <div className="leaderboard-actions">
