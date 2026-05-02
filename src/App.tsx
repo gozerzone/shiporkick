@@ -1,22 +1,29 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ArenaWheel } from './components/ArenaWheel'
+import { AuthModal } from './components/AuthModal'
 import { Bounty } from './components/Bounty'
 import { ClerkAuthBar } from './components/ClerkAuthBar'
 import { FoulButton } from './components/FoulButton'
-import { GlobalLeaderboard } from './components/GlobalLeaderboard'
 import { LeaderboardView } from './components/LeaderboardView'
+import { PipMiniPlayer, isDocumentPipSupported } from './components/PipMiniPlayer'
+import type { LeaderboardStreamer } from './lib/globalLeaderboardRealtime'
 import { StreamerMessages } from './components/StreamerMessages'
 import { StreamerHUD } from './components/StreamerHUD'
 import { StreamMultiplexer } from './components/StreamMultiplexer'
 import { ViewerStage } from './components/ViewerStage'
 import { WastedOverlay } from './components/WastedOverlay'
+import { resolveHostRoomName } from './lib/livekitRoom'
 import { subscribeToProfileShield } from './lib/profileShieldRealtime'
 import { publicDb } from './lib/publicSupabase'
 import { getPublicEnv } from './lib/runtimeEnv'
+import { getSupabase } from './lib/supabaseClient'
 import { subscribeToSessionHud } from './lib/sessionHealthRealtime'
 import {
   activateDeepWorkShield,
+  fetchMyTokenBalance,
   fetchProfileIdForClerk,
   fetchTokenBalances,
+  updateMyAvatar,
   type TokenBalances,
 } from './lib/tokens'
 import { normalizeWorkCategory, WORK_CATEGORIES, type WorkCategory } from './lib/workCategories'
@@ -41,12 +48,12 @@ const HOUR_MS = 60 * 60 * 1000
 const SCREEN_ONLY_CREDIT_MS = 3 * HOUR_MS
 
 const HOW_IT_WORKS = [
-  { icon: '📡', title: 'Go Live', desc: 'Share your screen + camera. One button. You\'re in the arena.' },
+  { icon: '📡', title: 'Go Live', desc: 'Share your screen + camera. One button. You\'re working in front of everyone.' },
   { icon: '⚡', title: 'Earn Tokens', desc: '1 token per hour streamed. Stay consistent, stack tokens.' },
-  { icon: '👢', title: 'Vote to Kick', desc: 'See someone slacking? 3 votes from different people ends their session.' },
-  { icon: '🎧', title: 'The Headphone System', desc: 'Vote 1 knocks off one ear cup. Vote 2 takes the other. Vote 3 shatters the band. Then — KICKED.' },
-  { icon: '🛡️', title: 'Block Tokens', desc: 'Spend tokens to block incoming kicks. Activate Deep Work mode.' },
-  { icon: '🔥', title: 'Streaks', desc: 'Your streak is hours of consecutive shipping. The leaderboard is forever.' },
+  { icon: '🎧', title: 'Vote to Jerk', desc: 'Catch someone slacking? 3 votes from different people pulls the plug on their session.' },
+  { icon: '🔌', title: 'The Headphone System', desc: 'Vote 1 yanks one ear cup. Vote 2 takes the other. Vote 3 jerks the cable right out — JERKED.' },
+  { icon: '🛡️', title: 'Block Tokens', desc: 'Spend tokens to block incoming jerks. Activate Deep Work mode.' },
+  { icon: '🔥', title: 'Streaks', desc: 'Your streak is consecutive days of shipping. The leaderboard is forever.' },
 ]
 
 function slugify(input: string) {
@@ -77,6 +84,22 @@ function App() {
   const [activeTab, setActiveTab] = useState<Tab>('arena')
   const [showGoLive, setShowGoLive] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
+  const [showAuth, setShowAuth] = useState(false)
+  const [authEmail, setAuthEmail] = useState<string | null>(null)
+  const [authUserId, setAuthUserId] = useState<string | null>(null)
+  const [usernameDraft, setUsernameDraft] = useState('')
+  const [usernameSaveMsg, setUsernameSaveMsg] = useState<string | null>(null)
+  const [usernameSaveBusy, setUsernameSaveBusy] = useState(false)
+  const [needsUsername, setNeedsUsername] = useState(false)
+  const [queuePosition, setQueuePosition] = useState<number | null>(null)
+  const [queueActiveCount, setQueueActiveCount] = useState(0)
+  const [myTokens, setMyTokens] = useState(0)
+  const [myAvatar, setMyAvatar] = useState<string | null>(null)
+  const [avatarSavingMsg, setAvatarSavingMsg] = useState<string | null>(null)
+  const [pipStreamer, setPipStreamer] = useState<LeaderboardStreamer | null>(null)
+  const [goLiveEverOpened, setGoLiveEverOpened] = useState(false)
+  const [isGoLiveMinimized, setIsGoLiveMinimized] = useState(false)
+  const [streamStartTime, setStreamStartTime] = useState<number | null>(null)
 
   const [loginMode, setLoginMode] = useState<LoginMode>('guest')
   const [accountIdDraft, setAccountIdDraft] = useState('')
@@ -129,22 +152,124 @@ function App() {
   const handleLiveChange = useCallback((isLive: boolean, hasCamera: boolean) => {
     setIsStreaming(isLive)
     setStreamHasCamera(hasCamera)
-    if (isLive) setShowGoLive(false)
+    if (isLive) setStreamStartTime(Date.now())
+    else setStreamStartTime(null)
   }, [])
 
   const handleIdleKick = useCallback(() => setCurrentHealth(0), [])
 
   const refreshTokens = useCallback(async () => {
-    if (!clerkUserId) { setTokenBalances(null); return }
-    try {
-      setTokenError(null)
-      setTokenBalances(await fetchTokenBalances(clerkUserId))
-    } catch (e) {
-      setTokenError(e instanceof Error ? e.message : 'Token load failed.')
+    setTokenError(null)
+    if (clerkUserId) {
+      try { setTokenBalances(await fetchTokenBalances(clerkUserId)) }
+      catch (e) { setTokenError(e instanceof Error ? e.message : 'Token load failed.') }
+    } else {
+      setTokenBalances(null)
     }
-  }, [clerkUserId])
+    if (authUserId) {
+      try { setMyTokens(await fetchMyTokenBalance()) }
+      catch { /* ignore */ }
+    } else {
+      setMyTokens(0)
+    }
+  }, [clerkUserId, authUserId])
 
   useEffect(() => { queueMicrotask(() => { void refreshTokens() }) }, [refreshTokens])
+
+  // Supabase Auth — track logged-in user (persists across page loads)
+  useEffect(() => {
+    const supa = getSupabase()
+    if (!supa) return
+
+    const linkProfile = async (user: { id: string; email?: string | null }) => {
+      const db = publicDb()
+      if (!db) return
+      const { data: existing } = await db
+        .from('profiles')
+        .select('username, avatar_emoji')
+        .eq('auth_user_id', user.id)
+        .maybeSingle()
+      if (existing && (existing as { username?: string }).username) {
+        const u = (existing as { username: string; avatar_emoji?: string | null }).username
+        const av = (existing as { avatar_emoji?: string | null }).avatar_emoji ?? null
+        setAccountId(u)
+        setAccountIdDraft(u)
+        setUsernameDraft(u)
+        setMyAvatar(av)
+        setNeedsUsername(false)
+      } else {
+        // Auto-create profile so the user immediately has 1 XP and 2 tokens
+        // (server-side defaults via link_or_create_profile RPC + tokens DEFAULTs)
+        const guess = (user.email ?? '').split('@')[0].replace(/[^a-z0-9_-]/gi, '').toLowerCase() || 'streamer'
+        try {
+          const { data: created } = await db.rpc('link_or_create_profile', { p_username: guess })
+          const row = (Array.isArray(created) ? created[0] : created) as { username?: string; avatar_emoji?: string | null } | null
+          const u = row?.username ?? guess
+          setAccountId(u)
+          setAccountIdDraft(u)
+          setUsernameDraft(u)
+          setMyAvatar(row?.avatar_emoji ?? null)
+          setNeedsUsername(false)
+        } catch {
+          // Fallback: surface manual username chooser
+          setUsernameDraft(guess)
+          setAccountId(guess)
+          setAccountIdDraft(guess)
+          setNeedsUsername(true)
+        }
+      }
+    }
+
+    void supa.auth.getSession().then(({ data }) => {
+      const user = data.session?.user
+      if (user) {
+        setAuthUserId(user.id)
+        setAuthEmail(user.email ?? null)
+        void linkProfile(user)
+      }
+    })
+    const { data: sub } = supa.auth.onAuthStateChange((_event, session) => {
+      const user = session?.user
+      setAuthUserId(user?.id ?? null)
+      setAuthEmail(user?.email ?? null)
+      if (user) {
+        setLoginMode('account')
+        void linkProfile(user)
+        setShowProfile(true)
+      } else {
+        setNeedsUsername(false)
+        setUsernameDraft('')
+      }
+    })
+    return () => sub.subscription.unsubscribe()
+  }, [])
+
+  const saveUsername = async () => {
+    const supa = getSupabase()
+    const db = publicDb()
+    if (!supa || !db || !authUserId) return
+    const u = usernameDraft.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '')
+    if (u.length < 3) { setUsernameSaveMsg('Username must be at least 3 chars (letters, numbers, _, -).'); return }
+    setUsernameSaveBusy(true); setUsernameSaveMsg(null)
+    try {
+      const { data, error } = await db.rpc('link_or_create_profile', { p_username: u })
+      if (error) {
+        // Surface the real Postgrest error (PostgrestError has .message, .code, .hint, .details)
+        const detail = [error.message, error.hint, error.details].filter(Boolean).join(' — ')
+        throw new Error(detail || 'unknown error')
+      }
+      const row = (Array.isArray(data) ? data[0] : data) as { username?: string } | null
+      const saved = row?.username ?? u
+      setAccountId(saved)
+      setAccountIdDraft(saved)
+      setUsernameDraft(saved)
+      setNeedsUsername(false)
+      setUsernameSaveMsg('Saved.')
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      setUsernameSaveMsg(/duplicate|taken|unique/i.test(msg) ? 'Username taken — try another.' : `Save failed: ${msg}`)
+    } finally { setUsernameSaveBusy(false) }
+  }
 
   useEffect(() => {
     if (!clerkUserId) { queueMicrotask(() => setMyProfileId(null)); return }
@@ -282,6 +407,44 @@ function App() {
     return () => window.clearInterval(t)
   }, [isStreaming, streamHasCamera, viewerSessionId])
 
+  // Queue polling — when user is queued, check position + active count every 5s.
+  // Auto-retry start_stream_session when at top of queue and a slot opens.
+  useEffect(() => {
+    if (queuePosition === null) return
+    const db = publicDb()
+    if (!db) return
+    let cancelled = false
+    const tick = async () => {
+      const { data, error } = await db.rpc('get_queue_status', { p_username: streamerHandle })
+      if (cancelled || error) return
+      const status = data as { in_queue: boolean; position: number | null; active: number; cap: number } | null
+      if (!status) return
+      setQueueActiveCount(status.active)
+      if (!status.in_queue) {
+        setQueuePosition(null)
+        return
+      }
+      setQueuePosition(status.position ?? null)
+      // If we're #1 and a slot is open, retry by re-flipping isStreaming.
+      // The user already gave gesture permission for capture in this session, so we can republish.
+      if (status.position === 1 && status.active < status.cap) {
+        // Retry by re-triggering the session-start effect (no auto screen capture).
+        // Surface "your turn" notice; user clicks again to re-share screen.
+        setSessionSyncError('Your turn! Click GO LIVE to start.')
+      }
+    }
+    void tick()
+    const t = window.setInterval(tick, 5000)
+    return () => { cancelled = true; window.clearInterval(t) }
+  }, [queuePosition, streamerHandle])
+
+  const leaveQueue = useCallback(async () => {
+    const db = publicDb()
+    if (!db) return
+    await db.rpc('leave_queue', { p_username: streamerHandle })
+    setQueuePosition(null)
+  }, [streamerHandle])
+
   // Heartbeat — keeps leaderboard row alive
   useEffect(() => {
     if (!isStreaming || !activeSessionId || viewerSessionId) return
@@ -289,8 +452,38 @@ function App() {
     if (!db) return
     const beat = async () => { try { await db.rpc('heartbeat_session', { p_session_id: activeSessionId }) } catch { /* ignore */ } }
     beat()
-    const t = window.setInterval(beat, 60_000)
+    const t = window.setInterval(beat, 30_000)
     return () => window.clearInterval(t)
+  }, [isStreaming, activeSessionId, viewerSessionId])
+
+  // Stop session on page unload — survives the unload via fetch keepalive
+  useEffect(() => {
+    if (!isStreaming || !activeSessionId || viewerSessionId) return
+
+    const stopOnUnload = () => {
+      const url = getPublicEnv('VITE_SUPABASE_URL')
+      const anon = getPublicEnv('VITE_SUPABASE_ANON_KEY')
+      if (!url || !anon || !activeSessionId) return
+      try {
+        fetch(`${url}/rest/v1/rpc/stop_stream_session`, {
+          method: 'POST',
+          headers: {
+            apikey: anon,
+            Authorization: `Bearer ${anon}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ p_session_id: activeSessionId }),
+          keepalive: true,
+        }).catch(() => {})
+      } catch { /* ignore */ }
+    }
+
+    window.addEventListener('beforeunload', stopOnUnload)
+    window.addEventListener('pagehide', stopOnUnload)
+    return () => {
+      window.removeEventListener('beforeunload', stopOnUnload)
+      window.removeEventListener('pagehide', stopOnUnload)
+    }
   }, [isStreaming, activeSessionId, viewerSessionId])
 
   useEffect(() => {
@@ -302,11 +495,30 @@ function App() {
     if (isStreaming && !activeSessionId) {
       void (async () => {
         const { data, error } = await db.rpc('start_stream_session', {
-          p_username: streamerHandle, p_task_description: taskOfHour, p_work_category: workCategory,
+          p_username: streamerHandle,
+          p_task_description: taskOfHour,
+          p_work_category: workCategory,
+          p_livekit_room: resolveHostRoomName(userId),
         })
         if (cancelled) return
-        if (error) { setSessionSyncError(`Session start failed: ${error.message}`); return }
-        if (typeof data === 'string') { setActiveSessionId(data); setSessionSyncError(null) }
+        if (error) {
+          if (/STREAM_LIMIT_REACHED/.test(error.message)) {
+            // 10 active streams reached — server already added us to the queue.
+            // Stop the local stream and surface queue UI; we'll auto-retry when promoted.
+            setSessionSyncError(null)
+            setIsStreaming(false)
+            setStreamStartTime(null)
+            setQueuePosition(1) // optimistic; real value comes from polling
+            return
+          }
+          setSessionSyncError(`Session start failed: ${error.message}`)
+          return
+        }
+        if (typeof data === 'string') {
+          setActiveSessionId(data)
+          setSessionSyncError(null)
+          setQueuePosition(null)
+        }
       })()
       return () => { cancelled = true }
     }
@@ -337,15 +549,35 @@ function App() {
   }, [activeSessionId, isStreaming, streamerHandle, taskOfHour, viewerSessionId, workCategory])
 
   const initials = (displayName || '?').slice(0, 2).toUpperCase()
+  const AVATAR_OPTIONS = ['🦊', '🦅', '🐺', '🐉', '🦁', '🐻', '🔥', '⚡', '🚀', '💻', '🎯', '🌊', '🎮', '🦾', '👾', '🤖', '🎧', '🔌', '🌪️', '🧠']
+
+  const handlePopOutWithLeaderboard = useCallback((s: LeaderboardStreamer) => {
+    if (!isDocumentPipSupported()) return
+    setPipStreamer(s)
+  }, [])
+
+  const saveAvatar = async (emoji: string) => {
+    setAvatarSavingMsg(null)
+    try {
+      await updateMyAvatar(emoji)
+      setMyAvatar(emoji)
+      setAvatarSavingMsg('Saved.')
+    } catch (e) {
+      setAvatarSavingMsg(e instanceof Error ? e.message : 'Failed.')
+    }
+  }
 
   return (
     <div className="app-shell">
       <WastedOverlay visible={isWasted} />
+      {pipStreamer && (
+        <PipMiniPlayer streamer={pipStreamer} onClose={() => setPipStreamer(null)} />
+      )}
 
       {/* ── Sticky header ── */}
       <header className="site-header">
         <div className="site-header__brand">
-          <span className="site-header__logo">SHIP OR KICK</span>
+          <span className="site-header__logo">WORK OR JERK</span>
           <div className="live-pulse">
             <div className="live-pulse__dot" />
             <span className="live-pulse__label">LIVE</span>
@@ -366,13 +598,22 @@ function App() {
         </nav>
 
         <div className="site-header__actions">
-          {tokenBalances && (
-            <span className="site-header__tokens">⚡ {tokenBalances.kickTokens}</span>
+          {!authUserId && (
+            <button type="button" className="btn btn-ghost" style={{ fontSize: '10px', padding: '4px 10px' }} onClick={() => setShowAuth(true)}>
+              SIGN IN
+            </button>
+          )}
+          {authUserId && (
+            <span className="site-header__tokens" title="Tokens (jerk or vouch)">🪙 {myTokens}</span>
           )}
           {isStreaming ? (
-            <span className="site-header__live-badge">● LIVE</span>
+            <button type="button" className="site-header__live-badge" style={{ cursor: 'pointer' }} onClick={() => { setIsGoLiveMinimized(false); setShowGoLive(true) }}>● LIVE</button>
+          ) : queuePosition !== null ? (
+            <button type="button" className="btn btn-ghost" style={{ fontSize: '10px' }} onClick={() => setShowGoLive(true)}>
+              🕒 QUEUE #{queuePosition}
+            </button>
           ) : !viewerSessionId ? (
-            <button type="button" className="btn btn--primary" onClick={() => setShowGoLive(true)}>
+            <button type="button" className="btn btn--primary" onClick={() => { setGoLiveEverOpened(true); setShowGoLive(true); setIsGoLiveMinimized(false) }}>
               GO LIVE
             </button>
           ) : null}
@@ -398,18 +639,20 @@ function App() {
             <div>
               <div className="arena-header">
                 <div>
-                  <h1 className="arena-title">The Arena</h1>
-                  <p className="arena-subtitle">Active shippers · 3 votes to kick</p>
+                  <h1 className="arena-title">Stream your work or be a <em style={{ color: 'var(--pink)', fontStyle: 'italic' }}>jerk</em></h1>
+                  <p className="arena-subtitle">Active workers · 3 votes pull the plug</p>
                 </div>
               </div>
               {isLobbyMode && displayCooldownMs > 0 && (
                 <p className="error" style={{ marginBottom: 12 }}>COOLDOWN: {cooldownRemainingMinutes}m remaining</p>
               )}
               {sessionSyncError && <p className="error" style={{ marginBottom: 12 }}>{sessionSyncError}</p>}
-              <GlobalLeaderboard
+              <ArenaWheel
                 clerkUserId={clerkUserId}
+                authUserId={authUserId}
                 myProfileId={myProfileId}
                 onTokenEconomyChanged={() => void refreshTokens()}
+                onPopOutWithLeaderboard={handlePopOutWithLeaderboard}
               />
             </div>
           )
@@ -417,14 +660,20 @@ function App() {
 
         {/* LEADERBOARD */}
         {activeTab === 'leaderboard' && (
-          <LeaderboardView clerkUserId={clerkUserId} myProfileId={myProfileId} />
+          <LeaderboardView
+            clerkUserId={clerkUserId}
+            authUserId={authUserId}
+            myProfileId={myProfileId}
+            onTokenEconomyChanged={() => void refreshTokens()}
+            onPopOutWithLeaderboard={handlePopOutWithLeaderboard}
+          />
         )}
 
         {/* HOW IT WORKS */}
         {activeTab === 'how-it-works' && (
           <div>
             <h1 className="arena-title" style={{ marginBottom: 6 }}>How It Works</h1>
-            <p className="arena-subtitle" style={{ marginBottom: 24 }}>The rules of the arena</p>
+            <p className="arena-subtitle" style={{ marginBottom: 24 }}>Stream your work or get jerked</p>
             <div className="stack">
               {HOW_IT_WORKS.map((item) => (
                 <div key={item.title} className="how-card">
@@ -441,65 +690,99 @@ function App() {
       </div>
 
       {/* ── GO LIVE modal ── */}
-      {showGoLive && (
-        <div className="modal-overlay" onClick={() => setShowGoLive(false)}>
+      {/* GO LIVE modal — CSS display keeps StreamMultiplexer mounted while streaming */}
+      {goLiveEverOpened && (
+      <div style={{ display: (showGoLive || isStreaming) && !isGoLiveMinimized ? 'flex' : 'none', position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', zIndex: 200, alignItems: 'flex-start', justifyContent: 'center', padding: '24px 16px', overflowY: 'auto' }}
+        onClick={() => { if (!isStreaming) setShowGoLive(false) }}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
             <div className="modal-box__header">
-              <span className="modal-box__title">GO LIVE</span>
-              <button type="button" className="modal-box__close" onClick={() => setShowGoLive(false)}>✕</button>
+              {isStreaming ? (
+                <span className="modal-box__title" style={{ color: 'var(--pink)' }}>● STREAMING LIVE</span>
+              ) : (
+                <span className="modal-box__title">GO LIVE</span>
+              )}
+              <div style={{ display: 'flex', gap: 8 }}>
+                {isStreaming && (
+                  <button type="button" className="btn btn-muted" style={{ fontSize: '10px', padding: '3px 10px' }} onClick={() => { setIsGoLiveMinimized(true); setShowGoLive(false) }}>
+                    — MINIMIZE
+                  </button>
+                )}
+                <button type="button" className="modal-box__close" onClick={() => setShowGoLive(false)}>✕</button>
+              </div>
             </div>
 
             <div className="stack">
-              <div>
-                <div className="modal-section-label">IDENTITY</div>
-                <div className="stack" style={{ marginTop: 8 }}>
-                  <select className="select" value={loginMode} onChange={(e) => setLoginMode(e.target.value as LoginMode)}>
-                    <option value="guest">Guest (quick start)</option>
-                    <option value="account">Account (saves your stats)</option>
-                  </select>
-                  {loginMode === 'account' && (
-                    <>
-                      <input
-                        className="select"
-                        value={accountIdDraft}
-                        onChange={(e) => setAccountIdDraft(e.target.value)}
-                        placeholder="your-handle  (e.g. gozer)"
-                      />
-                      <button type="button" className="btn btn--primary" onClick={() => setAccountId(accountIdDraft)}>
-                        LOAD ACCOUNT
-                      </button>
-                      {accountId && (
-                        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--green)' }}>
-                          Loaded: @{slugify(accountId)}
-                        </p>
-                      )}
-                    </>
-                  )}
-                  <input
-                    className="select"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="Display name"
-                  />
-                  <input
-                    className="select"
-                    value={taskOfHour}
-                    onChange={(e) => setTaskOfHour(e.target.value)}
-                    placeholder="What are you shipping right now?"
-                  />
-                  <select className="select" value={workCategory} onChange={(e) => setWorkCategory(normalizeWorkCategory(e.target.value))}>
-                    {WORK_CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
-                  </select>
+              {queuePosition !== null && !isStreaming && (
+                <div style={{ background: 'var(--card2)', border: '1px solid var(--gold)', borderRadius: 6, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: 'var(--gold)', letterSpacing: 1 }}>
+                    🕒 WAITING ROOM · POSITION #{queuePosition}
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', lineHeight: 1.6 }}>
+                    {queueActiveCount}/10 streamers live. {queuePosition === 1
+                      ? 'You\'re next — click START STREAM below the moment a slot opens.'
+                      : `${queuePosition - 1} ahead of you. We\'ll auto-promote you when it\'s your turn.`}
+                  </div>
+                  <button type="button" className="btn btn-muted" style={{ fontSize: 10, alignSelf: 'flex-start' }} onClick={() => void leaveQueue()}>
+                    LEAVE QUEUE
+                  </button>
                 </div>
-              </div>
+              )}
+              {!isStreaming && (
+                <div>
+                  <div className="modal-section-label">IDENTITY</div>
+                  <div className="stack" style={{ marginTop: 8 }}>
+                    <select className="select" value={loginMode} onChange={(e) => setLoginMode(e.target.value as LoginMode)}>
+                      <option value="guest">Guest (quick start)</option>
+                      <option value="account">Returning streamer — enter your handle</option>
+                    </select>
+                    {loginMode === 'account' && (
+                      <>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <input
+                            className="select"
+                            style={{ flex: 1 }}
+                            value={accountIdDraft}
+                            onChange={(e) => setAccountIdDraft(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') setAccountId(accountIdDraft) }}
+                            placeholder="your-handle  (e.g. gozer)"
+                          />
+                          <button type="button" className="btn btn--primary" onClick={() => setAccountId(accountIdDraft)}>
+                            LOAD
+                          </button>
+                        </div>
+                        {accountId && (
+                          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--green)' }}>
+                            ✓ Loaded: @{slugify(accountId)}
+                          </p>
+                        )}
+                      </>
+                    )}
+                    <input
+                      className="select"
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                      placeholder="Display name"
+                    />
+                    <input
+                      className="select"
+                      value={taskOfHour}
+                      onChange={(e) => setTaskOfHour(e.target.value)}
+                      placeholder="What are you shipping right now?"
+                    />
+                    <select className="select" value={workCategory} onChange={(e) => setWorkCategory(normalizeWorkCategory(e.target.value))}>
+                      {WORK_CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+                    </select>
+                  </div>
+                </div>
+              )}
 
-              {clerkConfigured && (
+              {clerkConfigured && !isStreaming && (
                 <ClerkAuthBar streamerHandle={streamerHandle} onUserId={setClerkUserId} />
               )}
 
               <div>
-                <div className="modal-section-label">STREAM</div>
-                <div style={{ marginTop: 8 }}>
+                {!isStreaming && <div className="modal-section-label">STREAM</div>}
+                <div style={{ marginTop: isStreaming ? 0 : 8 }}>
                   <StreamMultiplexer
                     userId={userId}
                     disabled={isLobbyMode && displayCooldownMs > 0}
@@ -510,7 +793,7 @@ function App() {
                 </div>
               </div>
 
-              {isLoggedIn && (
+              {isLoggedIn && isStreaming && (
                 <div>
                   <div className="modal-section-label">MESSAGES</div>
                   <div style={{ marginTop: 8 }}>
@@ -527,6 +810,10 @@ function App() {
           </div>
         </div>
       )}
+      {/* end goLiveEverOpened */}
+
+      {/* ── AUTH modal ── */}
+      {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
 
       {/* ── PROFILE modal ── */}
       {showProfile && (
@@ -538,9 +825,34 @@ function App() {
             </div>
 
             <div className="stack">
-              <div className="profile-avatar">{initials}</div>
+              <div className="profile-avatar">{myAvatar || initials}</div>
               <div className="profile-name">{displayName}</div>
               <div className="profile-handle">@{streamerHandle}</div>
+
+              {authUserId && (
+                <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 6, padding: 10 }}>
+                  <div className="modal-section-label" style={{ marginBottom: 8 }}>AVATAR</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(40px, 1fr))', gap: 4 }}>
+                    {AVATAR_OPTIONS.map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() => void saveAvatar(emoji)}
+                        style={{
+                          background: myAvatar === emoji ? 'var(--pink-dim)' : 'var(--card)',
+                          border: `1px solid ${myAvatar === emoji ? 'var(--pink-border)' : 'var(--border)'}`,
+                          borderRadius: 4, fontSize: 20, padding: 6, cursor: 'pointer',
+                        }}
+                      >{emoji}</button>
+                    ))}
+                  </div>
+                  {avatarSavingMsg && (
+                    <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: avatarSavingMsg === 'Saved.' ? 'var(--green)' : 'var(--danger)', marginTop: 6 }}>
+                      {avatarSavingMsg}
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div className="profile-stat-grid">
                 <div className="profile-stat">
@@ -555,28 +867,62 @@ function App() {
                   <div className="profile-stat__label">HRS</div>
                   <div className="profile-stat__value">{Math.floor(totalStreamMs / HOUR_MS)}</div>
                 </div>
-                {tokenBalances && (
-                  <>
-                    <div className="profile-stat">
-                      <div className="profile-stat__label">KICK</div>
-                      <div className="profile-stat__value" style={{ color: 'var(--danger)' }}>{tokenBalances.kickTokens}</div>
-                    </div>
-                    <div className="profile-stat">
-                      <div className="profile-stat__label">SHIELD</div>
-                      <div className="profile-stat__value" style={{ color: 'var(--gold)' }}>{tokenBalances.blockKickTokens}</div>
-                    </div>
-                    <div className="profile-stat">
-                      <div className="profile-stat__label">VOUCH</div>
-                      <div className="profile-stat__value" style={{ color: 'var(--green)' }}>{tokenBalances.vouchPowerTokens}</div>
-                    </div>
-                  </>
+                {authUserId && (
+                  <div className="profile-stat" style={{ gridColumn: 'span 3' }}>
+                    <div className="profile-stat__label">TOKENS · jerk or vouch</div>
+                    <div className="profile-stat__value" style={{ color: 'var(--gold)' }}>🪙 {myTokens}</div>
+                  </div>
                 )}
               </div>
 
-              {loginMode === 'guest' && (
-                <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', textAlign: 'center' }}>
-                  Switch to Account mode in GO LIVE to keep your stats across sessions
+              {authEmail && (
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--green)', textAlign: 'center' }}>
+                  Signed in as {authEmail}
                 </p>
+              )}
+
+              {authUserId && (
+                <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 6, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div className="modal-section-label">{needsUsername ? 'CHOOSE A USERNAME' : 'USERNAME'}</div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input
+                      className="select"
+                      style={{ flex: 1 }}
+                      value={usernameDraft}
+                      onChange={(e) => setUsernameDraft(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') void saveUsername() }}
+                      placeholder="your-handle"
+                      disabled={usernameSaveBusy}
+                    />
+                    <button type="button" className="btn btn--primary" onClick={() => void saveUsername()} disabled={usernameSaveBusy || !usernameDraft.trim()}>
+                      {usernameSaveBusy ? 'SAVING' : 'SAVE'}
+                    </button>
+                  </div>
+                  {usernameSaveMsg && (
+                    <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: usernameSaveMsg === 'Saved.' ? 'var(--green)' : 'var(--danger)' }}>
+                      {usernameSaveMsg}
+                    </p>
+                  )}
+                  {needsUsername && !usernameSaveMsg && (
+                    <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)' }}>
+                      Pick a unique handle. Used to identify you on the leaderboard and in streams.
+                    </p>
+                  )}
+                </div>
+              )}
+              {!authUserId && loginMode === 'guest' && (
+                <button type="button" className="btn btn--primary" onClick={() => { setShowProfile(false); setShowAuth(true) }}>
+                  SIGN IN TO SAVE STATS
+                </button>
+              )}
+              {authUserId && (
+                <button type="button" className="btn btn-muted" style={{ fontSize: 10 }} onClick={() => {
+                  const supa = getSupabase()
+                  if (supa) void supa.auth.signOut()
+                  setShowProfile(false)
+                }}>
+                  SIGN OUT
+                </button>
               )}
 
               {clerkConfigured && !clerkUserId && (
@@ -623,6 +969,10 @@ function App() {
           playerName={displayName}
           shieldActive={shieldActive}
           glitchActive={glitchActive}
+          isStreaming={isStreaming}
+          streamStartTime={streamStartTime}
+          isGoLiveMinimized={isGoLiveMinimized}
+          onExpandGoLive={() => { setIsGoLiveMinimized(false); setShowGoLive(true) }}
         />
       )}
     </div>

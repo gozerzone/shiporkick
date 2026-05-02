@@ -13,10 +13,11 @@ export function buildRoomSlug(userId: string): string {
  * the server can mint per-room tokens; we then use a slug per host user id.
  */
 export function resolveHostRoomName(userId: string): string {
+  // With a token endpoint, each host gets their own room (slug per user) so multiple streamers
+  // can broadcast simultaneously without their video tracks colliding for viewers.
+  // Without an endpoint, fall back to the fixed room from runtime-config (static token flow).
   const hasEndpoint = Boolean(getPublicEnv('VITE_LIVEKIT_TOKEN_ENDPOINT'))
-  if (hasEndpoint) {
-    return buildRoomSlug(userId)
-  }
+  if (hasEndpoint) return buildRoomSlug(userId)
   const fixed = getPublicEnv('VITE_LIVEKIT_ROOM')
   if (fixed) return fixed
   return buildRoomSlug(userId)

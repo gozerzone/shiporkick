@@ -15,13 +15,14 @@ export function DisclaimerGate({ children }: DisclaimerGateProps) {
     <>
       <div className="disclaimer-gate">
         <div className="disclaimer-gate__box">
-          <div className="disclaimer-gate__logo">SHIP OR KICK</div>
-          <div className="disclaimer-gate__tagline">ENTER THE ARENA</div>
+          <div className="disclaimer-gate__logo">WORK OR JERK</div>
+          <div className="disclaimer-gate__tagline">CHOOSE TO STREAM YOUR WORK OR BE A JERK</div>
           <div className="disclaimer-gate__text">
-            Welcome to the arena. What happens here is between you, the internet, and whatever poor decisions led you
-            to this page. You must be 18 or older to proceed. By clicking Agree you swear on your streak that
-            you&apos;re a legal adult. We monitor nothing, moderate nothing, and accept zero responsibility for the
-            chaos that unfolds. Enter freely. Leave with your dignity intact — if you can. Good luck.
+            Stream your work in front of strangers — or get jerked off the air when they catch you slacking.
+            What happens here is between you, the internet, and whatever poor decisions led you to this page.
+            You must be 18 or older to proceed. By clicking Agree you swear on your streak that you&apos;re a legal
+            adult. We monitor nothing, moderate nothing, and accept zero responsibility for the chaos that unfolds.
+            Enter freely. Leave with your dignity intact — if you can.
           </div>
           <button
             type="button"

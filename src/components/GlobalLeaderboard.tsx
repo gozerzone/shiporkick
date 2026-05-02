@@ -5,8 +5,10 @@ import {
   type LeaderboardStreamer,
 } from '../lib/globalLeaderboardRealtime'
 import { getPublicEnv } from '../lib/runtimeEnv'
-import { spendKickGlitchToken, spendVouchPowerToken } from '../lib/tokens'
+import { spendJerk, spendVouch } from '../lib/tokens'
 import { WORK_CATEGORIES } from '../lib/workCategories'
+import { LiveThumbnail } from './LiveThumbnail'
+import { WatchModal } from './WatchModal'
 
 const XP_SEGMENT = 500
 
@@ -31,7 +33,7 @@ function RowHeadphones({ hp }: { hp: number }) {
     </svg>
   )
   if (kicks === 1) return (
-    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-label="1 kick vote">
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-label="1 jerk vote">
       <path d="M6 18v-4a10 10 0 0 1 20 0v4" stroke={MUTED} strokeWidth="2" strokeLinecap="round" fill="none" strokeDasharray="3 2"/>
       <rect x="3" y="16" width="5" height="8" rx="2" fill={MUTED} opacity="0.3"/>
       <line x1="3" y1="16" x2="8" y2="24" stroke={DANGER} strokeWidth="1.5"/>
@@ -40,7 +42,7 @@ function RowHeadphones({ hp }: { hp: number }) {
     </svg>
   )
   if (kicks === 2) return (
-    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-label="2 kick votes">
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-label="2 jerk votes">
       <path d="M6 18v-4a10 10 0 0 1 20 0v4" stroke={DANGER} strokeWidth="2" strokeLinecap="round" fill="none" strokeDasharray="2 3"/>
       <rect x="3" y="16" width="5" height="8" rx="2" fill={DANGER} opacity="0.3"/>
       <line x1="3" y1="16" x2="8" y2="24" stroke={DANGER} strokeWidth="1.5"/>
@@ -50,19 +52,30 @@ function RowHeadphones({ hp }: { hp: number }) {
       <line x1="29" y1="16" x2="24" y2="24" stroke={DANGER} strokeWidth="1.5"/>
     </svg>
   )
+  // 3rd state: cable + 3.5mm plug yanked clean out of the headphones.
   return (
-    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-label="Wasted">
-      <path d="M6 18v-4a10 10 0 0 1 20 0v4" stroke={DANGER} strokeWidth="2" strokeLinecap="round" fill="none" strokeDasharray="1 4" opacity="0.4"/>
-      <rect x="3" y="16" width="5" height="8" rx="2" fill={DANGER} opacity="0.2"/>
-      <rect x="24" y="16" width="5" height="8" rx="2" fill={DANGER} opacity="0.2"/>
-      <line x1="12" y1="8" x2="15" y2="12" stroke={DANGER} strokeWidth="1.5" opacity="0.6"/>
-      <line x1="17" y1="6" x2="20" y2="10" stroke={DANGER} strokeWidth="1.5" opacity="0.6"/>
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-label="Jerked — plug pulled">
+      {/* Faded headphones, intact but disconnected */}
+      <path d="M5 14v-2a8 8 0 0 1 16 0v2" stroke={DANGER} strokeWidth="1.5" strokeLinecap="round" fill="none" opacity="0.35"/>
+      <rect x="3" y="13" width="4" height="7" rx="1.5" fill={DANGER} opacity="0.25"/>
+      <rect x="19" y="13" width="4" height="7" rx="1.5" fill={DANGER} opacity="0.25"/>
+      {/* Yanked cable curving outward */}
+      <path d="M22.5 19 Q 27 22 26.5 27" stroke={DANGER} strokeWidth="1.7" fill="none" strokeLinecap="round"/>
+      {/* 3.5mm TRS plug at the end of the cable */}
+      <rect x="24.4" y="26.5" width="4.2" height="3.6" rx="0.6" fill={DANGER}/>
+      <line x1="25.3" y1="27.5" x2="25.3" y2="29.6" stroke="rgba(0,0,0,0.55)" strokeWidth="0.5"/>
+      <line x1="26.5" y1="27.5" x2="26.5" y2="29.6" stroke="rgba(0,0,0,0.55)" strokeWidth="0.5"/>
+      <line x1="27.7" y1="27.5" x2="27.7" y2="29.6" stroke="rgba(0,0,0,0.55)" strokeWidth="0.5"/>
+      {/* Motion lines showing the yank */}
+      <line x1="20" y1="22" x2="22" y2="20.5" stroke={DANGER} strokeWidth="1" opacity="0.45"/>
+      <line x1="22" y1="24" x2="24" y2="22.5" stroke={DANGER} strokeWidth="1" opacity="0.45"/>
     </svg>
   )
 }
 
 interface GlobalLeaderboardProps {
   clerkUserId: string | null
+  authUserId?: string | null
   myProfileId: string | null
   onTokenEconomyChanged?: () => void
 }
@@ -78,7 +91,7 @@ function rowEmoji(username: string): string {
   return pool[username.charCodeAt(0) % pool.length]
 }
 
-export function GlobalLeaderboard({ clerkUserId, myProfileId, onTokenEconomyChanged }: GlobalLeaderboardProps) {
+export function GlobalLeaderboard({ clerkUserId, authUserId, myProfileId, onTokenEconomyChanged }: GlobalLeaderboardProps) {
   const supabaseConfigured = useMemo(
     () => Boolean(getPublicEnv('VITE_SUPABASE_URL') && getPublicEnv('VITE_SUPABASE_ANON_KEY')),
     [],
@@ -89,6 +102,7 @@ export function GlobalLeaderboard({ clerkUserId, myProfileId, onTokenEconomyChan
   const [error, setError] = useState<string | null>(null)
   const [rowNotice, setRowNotice] = useState<Record<string, string | null>>({})
   const [rowBusy, setRowBusy] = useState<Record<string, boolean>>({})
+  const [watchingStreamer, setWatchingStreamer] = useState<LeaderboardStreamer | null>(null)
 
   const filteredRows = useMemo(() => {
     if (selectedCategory === 'All categories') return rows
@@ -140,16 +154,16 @@ export function GlobalLeaderboard({ clerkUserId, myProfileId, onTokenEconomyChan
     setRowBusy((prev) => ({ ...prev, [sessionId]: busy }))
 
   const onKickGlitch = async (row: LeaderboardStreamer) => {
-    if (!clerkUserId) return
+    if (!authUserId) return
     setRowNotice((n) => ({ ...n, [row.sessionId]: null }))
     setBusy(row.sessionId, true)
     try {
-      await spendKickGlitchToken(clerkUserId, row.sessionId)
-      setRowNotice((n) => ({ ...n, [row.sessionId]: 'Glitch sent.' }))
+      await spendJerk(row.sessionId)
+      setRowNotice((n) => ({ ...n, [row.sessionId]: 'Jerk sent.' }))
       onTokenEconomyChanged?.()
       await load()
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Kick token failed.'
+      const msg = e instanceof Error ? e.message : 'Jerk failed.'
       setRowNotice((n) => ({ ...n, [row.sessionId]: msg }))
     } finally {
       setBusy(row.sessionId, false)
@@ -157,11 +171,11 @@ export function GlobalLeaderboard({ clerkUserId, myProfileId, onTokenEconomyChan
   }
 
   const onVouch = async (row: LeaderboardStreamer) => {
-    if (!clerkUserId) return
+    if (!authUserId) return
     setRowNotice((n) => ({ ...n, [row.sessionId]: null }))
     setBusy(row.sessionId, true)
     try {
-      await spendVouchPowerToken(clerkUserId, row.sessionId)
+      await spendVouch(row.sessionId)
       setRowNotice((n) => ({ ...n, [row.sessionId]: 'Vouch applied.' }))
       onTokenEconomyChanged?.()
       await load()
@@ -173,10 +187,20 @@ export function GlobalLeaderboard({ clerkUserId, myProfileId, onTokenEconomyChan
     }
   }
 
-  const canSpend = Boolean(clerkUserId)
+  const canSpend = Boolean(authUserId || clerkUserId)
   const categories = ['All categories', ...WORK_CATEGORIES]
 
   return (
+    <>
+    {watchingStreamer && (
+      <WatchModal
+        streamer={watchingStreamer}
+        clerkUserId={clerkUserId}
+        myProfileId={myProfileId}
+        onClose={() => setWatchingStreamer(null)}
+        onTokenEconomyChanged={onTokenEconomyChanged}
+      />
+    )}
     <article style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
       {/* Header */}
       <div style={{ padding: '16px 16px 12px' }}>
@@ -247,7 +271,7 @@ export function GlobalLeaderboard({ clerkUserId, myProfileId, onTokenEconomyChan
               </div>
 
               <div className={`leaderboard-avatar${isSelf ? ' leaderboard-avatar--self' : ''}`}>
-                {rowEmoji(row.username)}
+                {row.avatarEmoji || rowEmoji(row.username)}
               </div>
 
               <div className="leaderboard-info">
@@ -274,10 +298,16 @@ export function GlobalLeaderboard({ clerkUserId, myProfileId, onTokenEconomyChan
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)', flexShrink: 0 }}>
                     {xpMod}/{XP_SEGMENT} XP
                   </span>
+                  {row.streakDays > 0 && (
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--danger)', flexShrink: 0, fontWeight: 700 }}>
+                      🔥 {row.streakDays}d
+                    </span>
+                  )}
                 </div>
               </div>
 
-              <div style={{ flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                <LiveThumbnail streamer={row} compact onClick={() => setWatchingStreamer(row)} />
                 <RowHeadphones hp={row.currentHealth} />
               </div>
 
@@ -289,7 +319,7 @@ export function GlobalLeaderboard({ clerkUserId, myProfileId, onTokenEconomyChan
                     disabled={!canSpend || isSelf || busy}
                     onClick={() => void onKickGlitch(row)}
                   >
-                    ⚡ KICK
+                    🔌 JERK
                   </button>
                   <button
                     type="button"
@@ -311,5 +341,6 @@ export function GlobalLeaderboard({ clerkUserId, myProfileId, onTokenEconomyChan
         })}
       </div>
     </article>
+    </>
   )
 }

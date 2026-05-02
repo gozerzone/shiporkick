@@ -169,7 +169,7 @@ export function FoulButton({ sessionId }: FoulButtonProps) {
       setMessage(`Impact landed. Stream health is now ${result.current_health}.`)
     } else {
       setMessage(
-        `Kick vote recorded. ${result.needed_fouls - result.unique_fouls} more unique voter(s) needed.`,
+        `Jerk vote recorded. ${result.needed_fouls - result.unique_fouls} more unique voter(s) needed.`,
       )
     }
 
@@ -198,7 +198,7 @@ export function FoulButton({ sessionId }: FoulButtonProps) {
       </button>
 
       <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)', textAlign: 'center' }}>
-        3 unique voters trigger a kick · 1 vote per viewer per hour
+        3 unique voters jerk the plug · 1 vote per viewer per hour
       </p>
 
       {message && (

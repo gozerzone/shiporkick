@@ -155,10 +155,13 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
       }
       unpublishMultiplexedTracks()
 
+      // Simulcast lets viewers subscribe to a lower-res layer for thumbnails (saves egress bandwidth).
+      // Bitrate ceiling caps cost — 1 Mbps is plenty for ~800px@15fps screen content.
       await room.localParticipant.publishTrack(videoTrack, {
         source: Track.Source.ScreenShare,
-        simulcast: false,
+        simulcast: true,
         videoCodec: 'vp8',
+        videoEncoding: { maxBitrate: 1_000_000, maxFramerate: 15 },
       })
       publishedVideoRef.current = videoTrack
 

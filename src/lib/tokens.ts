@@ -49,6 +49,37 @@ export async function spendVouchPowerToken(clerkUserId: string, targetSessionId:
   if (error) throw new Error(error.message)
 }
 
+// Supabase Auth-aware spend functions — share a single token pool.
+// Both jerk and vouch decrement the same `kick_tokens` column on the server.
+export async function spendJerk(targetSessionId: string) {
+  const db = publicDb()
+  if (!db) throw new Error('Supabase not configured')
+  const { error } = await db.rpc('spend_jerk', { p_target_session_id: targetSessionId })
+  if (error) throw new Error(error.message)
+}
+
+export async function spendVouch(targetSessionId: string) {
+  const db = publicDb()
+  if (!db) throw new Error('Supabase not configured')
+  const { error } = await db.rpc('spend_vouch', { p_target_session_id: targetSessionId })
+  if (error) throw new Error(error.message)
+}
+
+export async function fetchMyTokenBalance(): Promise<number> {
+  const db = publicDb()
+  if (!db) return 0
+  const { data, error } = await db.rpc('my_token_balance')
+  if (error) return 0
+  return Number(data ?? 0)
+}
+
+export async function updateMyAvatar(emoji: string) {
+  const db = publicDb()
+  if (!db) throw new Error('Supabase not configured')
+  const { error } = await db.rpc('update_my_avatar', { p_emoji: emoji })
+  if (error) throw new Error(error.message)
+}
+
 export async function activateDeepWorkShield(clerkUserId: string) {
   const db = publicDb()
   if (!db) throw new Error('Supabase not configured')

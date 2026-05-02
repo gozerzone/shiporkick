@@ -1,7 +1,7 @@
 {
   "VITE_LIVEKIT_URL": "wss://shiporkick-1bnt2hsb.livekit.cloud",
   "VITE_LIVEKIT_TOKEN": "eyJhbGciOiJIUzI1NiJ9.eyJ2aWRlbyI6eyJyb29tIjoiTWFpbiIsInJvb21Kb2luIjp0cnVlLCJjYW5QdWJsaXNoIjp0cnVlLCJjYW5QdWJsaXNoRGF0YSI6dHJ1ZSwiY2FuU3Vic2NyaWJlIjp0cnVlfSwiaXNzIjoiQVBJUzRURFlCRnVBRWVnIiwiZXhwIjoxODA4MzYzNTU5LCJuYmYiOjE3NzY4Mjc1NTksInN1YiI6IlNoaXBPUktpY2sifQ.X0VkOlBU4MqtxbuOqQn6UTVbDwxGF0fggDV-sh9v5a8",
-  "VITE_LIVEKIT_TOKEN_ENDPOINT": "",
+  "VITE_LIVEKIT_TOKEN_ENDPOINT": "/api/livekit-token.php",
   "VITE_LIVEKIT_ROOM": "Main",
   "VITE_SUPABASE_URL": "https://ffymcoxtoaiefvbxmzyp.supabase.co",
   "VITE_SUPABASE_ANON_KEY": "sb_publishable_coWBQ6Y3zMQ-dLoWB_Vm5A_d4rOG6x0",
